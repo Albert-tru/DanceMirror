@@ -1,0 +1,147 @@
+### DanceMirror API 测试文件
+### 使用 VS Code REST Client 插件运行
+
+@baseUrl = http://localhost:8080/api/v1
+@contentType = application/json
+
+### 变量定义
+@testEmail = test@dancemirror.com
+@testPassword = Test123456
+
+### ============================================
+### 步骤 1: 用户注册
+### ============================================
+# @name register
+POST {{baseUrl}}/register
+Content-Type: {{contentType}}
+
+{
+  "email": "{{testEmail}}",
+  "password": "{{testPassword}}",
+  "firstName": "Test",
+  "lastName": "User"
+}
+
+### ============================================
+### 步骤 2: 用户登录
+### ============================================
+# @name login
+POST {{baseUrl}}/login
+Content-Type: {{contentType}}
+
+{
+  "email": "{{testEmail}}",
+  "password": "{{testPassword}}"
+}
+
+### 重要: 从上面的登录响应中复制 token，粘贴到下面
+### 替换下面的 YOUR_TOKEN_HERE
+@authToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHBpcmVzQXQiOjE3NTk5MzAzNjcsInVzZXJJRCI6IjEifQ.MK6omBMLTreroyNcoU_f0RnDZqmFRGlY50-RvYbdCIA
+
+### ============================================
+### 步骤 3: 获取视频列表 (需要认证)
+### ============================================
+GET {{baseUrl}}/videos
+Authorization: Bearer {{authToken}}
+
+### ============================================
+### 步骤 4: 上传视频 (需要认证)
+### ============================================
+# 注意：需要实际的视频文件
+POST {{baseUrl}}/videos/upload
+Authorization: Bearer {{authToken}}
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary
+
+------WebKitFormBoundary
+Content-Disposition: form-data; name="title"
+
+我的第一支舞蹈视频
+------WebKitFormBoundary
+Content-Disposition: form-data; name="description"
+
+这是一个测试视频
+------WebKitFormBoundary
+Content-Disposition: form-data; name="video"; filename="test.mp4"
+Content-Type: video/mp4
+
+< ./test.mp4
+------WebKitFormBoundary--
+
+### ============================================
+### 步骤 5: 获取特定视频详情
+### ============================================
+GET {{baseUrl}}/videos/1
+Authorization: Bearer {{authToken}}
+
+### ============================================
+### 步骤 6: 删除视频
+### ============================================
+DELETE {{baseUrl}}/videos/1
+Authorization: Bearer {{authToken}}
+
+### ============================================
+### 测试场景 A: 未授权访问 (应该失败 - 403)
+### ============================================
+GET {{baseUrl}}/videos
+
+### ============================================
+### 测试场景 B: 错误密码 (应该失败 - 401 或 400)
+### ============================================
+POST {{baseUrl}}/login
+Content-Type: {{contentType}}
+
+{
+  "email": "{{testEmail}}",
+  "password": "WrongPassword"
+}
+
+### ============================================
+### 测试场景 C: 重复注册 (应该失败 - 400)
+### ============================================
+POST {{baseUrl}}/register
+Content-Type: {{contentType}}
+
+{
+  "email": "{{testEmail}}",
+  "password": "{{testPassword}}",
+  "firstName": "Duplicate",
+  "lastName": "User"
+}
+
+### ============================================
+### 测试场景 D: 无效 token (应该失败 - 403)
+### ============================================
+GET {{baseUrl}}/videos
+Authorization: Bearer invalid_token_12345
+
+### ============================================
+### 测试场景 E: 注册新用户并测试
+### ============================================
+# @name registerNewUser
+POST {{baseUrl}}/register
+Content-Type: {{contentType}}
+
+{
+  "email": "newuser@dancemirror.com",
+  "password": "NewUser123456",
+  "firstName": "New",
+  "lastName": "User"
+}
+
+###
+# @name loginNewUser
+POST {{baseUrl}}/login
+Content-Type: {{contentType}}
+
+{
+  "email": "newuser@dancemirror.com",
+  "password": "NewUser123456"
+}
+
+### 从新用户登录响应复制 token 到这里
+@newUserToken = YOUR_NEW_USER_TOKEN_HERE
+
+###
+GET {{baseUrl}}/videos
+Authorization: Bearer {{newUserToken}}
+
