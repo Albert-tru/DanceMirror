@@ -1,0 +1,48 @@
+# 编译文件
+bin/
+*.exe
+*.out
+
+# 日志文件
+*.log
+server.log
+nohup.out
+
+# 上传的文件
+uploads/
+!uploads/.gitkeep
+
+# 环境变量
+.env
+.env.local
+
+# 数据库备份
+*.sql.bak
+*.db
+
+# 临时文件
+*.tmp
+*.swp
+*.swo
+*~
+.DS_Store
+
+# IDE 配置
+.vscode/
+.idea/
+*.iml
+
+# 依赖
+vendor/
+
+# 测试覆盖率
+coverage.out
+*.test
+
+# 备份文件
+*.bak
+*.backup
+
+# Go 相关
+go.work
+go.work.sum
