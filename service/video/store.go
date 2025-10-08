@@ -37,7 +37,7 @@ func (s *Store) GetVideoByID(id int) (*types.Video, error) {
 	return v, nil
 }
 
-func (s *Store) GetVideosByUserID(userID int) ([]*types.Video, error) {
+func (s *Store) GetVideos(userID int) ([]*types.Video, error) {
 	rows, err := s.db.Query("SELECT * FROM videos WHERE userId = ? ORDER BY createdAt DESC", userID)
 	if err != nil {
 		return nil, err

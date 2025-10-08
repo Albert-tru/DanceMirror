@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录测试</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: sans-serif;
+            padding: 20px;
+            background: #667eea;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 400px;
+            margin: 50px auto;
+        }
+        h1 { color: #667eea; margin-bottom: 20px; text-align: center; }
+        input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            margin-bottom: 15px;
+        }
+        button {
+            width: 100%;
+            padding: 15px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .log {
+            background: #000;
+            color: #0f0;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 20px;
+            white-space: pre-wrap;
+        }
+        .success { color: #00ff00; }
+        .error { color: #ff4444; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 登录测试</h1>
+        <input type="tel" id="phone" placeholder="手机号" value="13900139000">
+        <input type="password" id="password" placeholder="密码" value="Test123456">
+        <button onclick="test()">登录</button>
+        <div class="log" id="log"></div>
+    </div>
+
+    <script>
+        const API = window.location.origin + '/api/v1';
+        
+        function log(msg, type) {
+            const el = document.getElementById('log');
+            const c = type === 'error' ? 'error' : 'success';
+            el.innerHTML += `<span class="${c}">${msg}</span>\n`;
+            el.scrollTop = el.scrollHeight;
+        }
+        
+        async function test() {
+            document.getElementById('log').innerHTML = '';
+            const phone = document.getElementById('phone').value;
+            const pwd = document.getElementById('password').value;
+            
+            log('开始测试...', 'info');
+            log('手机号: ' + phone, 'info');
+            log('API: ' + API + '/login', 'info');
+            
+            try {
+                log('发送请求...', 'info');
+                const res = await fetch(API + '/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone, password: pwd })
+                });
+                
+                log('状态: ' + res.status, 'info');
+                const text = await res.text();
+                log('响应: ' + text, 'info');
+                
+                if (res.ok) {
+                    const data = JSON.parse(text);
+                    if (data.token) {
+                        log('✅ 登录成功！', 'success');
+                        log('Token: ' + data.token.substring(0, 30) + '...', 'success');
+                        localStorage.setItem('token', data.token);
+                        setTimeout(() => {
+                            window.location.href = '/static/index.html';
+                        }, 2000);
+                    } else {
+                        log('❌ 没有返回 token', 'error');
+                    }
+                } else {
+                    log('❌ 请求失败: ' + text, 'error');
+                }
+            } catch (e) {
+                log('❌ 错误: ' + e.message, 'error');
+                log('详情: ' + e.stack, 'error');
+            }
+        }
+    </script>
+</body>
+</html>
