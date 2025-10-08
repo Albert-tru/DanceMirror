@@ -4,191 +4,73 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DanceMirror - 舞蹈镜像平台</title>
+    <link rel="stylesheet" href="/static/css/common.css">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
             display: flex;
-            justify-content: center;
             align-items: center;
-            padding: 20px;
         }
         
-        .container {
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            max-width: 1200px;
-            width: 100%;
-            padding: 40px;
-        }
-        
-        h1 {
-            color: #667eea;
+        .hero-link {
             text-align: center;
-            margin-bottom: 10px;
-            font-size: 2.5em;
+            margin-bottom: 25px;
+            padding: 15px;
+            background: linear-gradient(135deg, rgba(102,126,234,0.1) 0%, rgba(118,75,162,0.1) 100%);
+            border-radius: 12px;
+            border: 2px solid #667eea;
         }
         
-        .subtitle {
-            text-align: center;
-            color: #666;
-            margin-bottom: 30px;
-        }
-        
-        .tabs {
-            display: flex;
-            justify-content: center;
-            gap: 10px;
-            margin-bottom: 30px;
-            border-bottom: 2px solid #eee;
-        }
-        
-        .tab {
-            padding: 15px 30px;
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 16px;
-            color: #666;
-            border-bottom: 3px solid transparent;
-            transition: all 0.3s;
-        }
-        
-        .tab.active {
-            color: #667eea;
-            border-bottom-color: #667eea;
-            font-weight: bold;
-        }
-        
-        .tab:hover {
-            color: #667eea;
-        }
-        
-        .tab-content {
-            display: none;
-        }
-        
-        .tab-content.active {
-            display: block;
-            animation: fadeIn 0.3s;
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        .form-group {
-            margin-bottom: 20px;
-        }
-        
-        label {
-            display: block;
-            margin-bottom: 8px;
-            color: #333;
-            font-weight: 500;
-        }
-        
-        input[type="text"],
-        input[type="email"],
-        input[type="password"],
-        textarea {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 14px;
-            transition: border-color 0.3s;
-        }
-        
-        input:focus,
-        textarea:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-        
-        button {
+        .hero-link a {
+            display: inline-block;
+            padding: 14px 35px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
+            text-decoration: none;
+            border-radius: 25px;
+            font-weight: bold;
+            font-size: 16px;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+        
+        .hero-link a:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+        }
+        
+        .hero-link p {
+            font-size: 13px;
+            color: #666;
+            margin-top: 12px;
+        }
+        
+        /* 简洁的标签设计 */
+        .auth-tabs {
+            display: flex;
+            border-bottom: none;
+            margin-bottom: 30px;
+            background: #f8f9fa;
+            border-radius: 25px;
+            padding: 4px;
+        }
+        
+        .auth-tabs .tab {
+            flex: 1;
             padding: 12px 30px;
             border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            cursor: pointer;
-            transition: transform 0.2s;
-            width: 100%;
-            font-weight: bold;
-        }
-        
-        button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-        
-        button:active {
-            transform: translateY(0);
-        }
-        
-        .message {
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            display: none;
-        }
-        
-        .message.success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        
-        .message.error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        
-        .video-list {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 20px;
-            margin-top: 20px;
-        }
-        
-        .video-card {
-            border: 2px solid #e0e0e0;
-            border-radius: 12px;
-            padding: 15px;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        
-        .video-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-        }
-        
-        .video-card h3 {
-            color: #333;
-            margin-bottom: 10px;
-        }
-        
-        .video-card p {
+            background: transparent;
             color: #666;
-            margin-bottom: 10px;
+            font-size: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border-radius: 20px;
         }
         
-        .video-card video {
-            width: 100%;
-            border-radius: 8px;
-            margin-bottom: 10px;
+        .auth-tabs .tab.active {
+            background: white;
+            color: #667eea;
+            font-weight: bold;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
         }
         
         .auth-section {
@@ -199,46 +81,24 @@
             display: block;
         }
         
-        .user-info {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            display: none;
+        /* 手机号输入框样式 */
+        .phone-input-group {
+            position: relative;
         }
         
-        .user-info.show {
-            display: block;
-        }
-        
-        .btn-logout {
-            background: #dc3545;
-            width: auto;
-            padding: 8px 20px;
+        .phone-input-group::before {
+            content: '🇨🇳 +86';
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #667eea;
+            font-weight: bold;
             font-size: 14px;
         }
         
-        .loading {
-            text-align: center;
-            padding: 20px;
-            color: #666;
-        }
-        
-        .file-upload {
-            border: 2px dashed #667eea;
-            border-radius: 8px;
-            padding: 30px;
-            text-align: center;
-            cursor: pointer;
-            transition: background 0.3s;
-        }
-        
-        .file-upload:hover {
-            background: #f8f9fa;
-        }
-        
-        .file-upload input[type="file"] {
-            display: none;
+        .phone-input-group input {
+            padding-left: 80px;
         }
     </style>
 </head>
@@ -247,78 +107,87 @@
         <h1>🕺 DanceMirror</h1>
         <p class="subtitle">舞蹈视频分享与学习平台</p>
         
-        <div style="text-align: center; margin-bottom: 20px;">
-            <a href="video-player.html" style="display: inline-block; padding: 12px 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: bold; transition: transform 0.2s;">
-                🎬 进入增强视频播放器
-            </a>
-            <p style="font-size: 13px; color: #666; margin-top: 10px;">
-                ⏱️ 播放速度调节 | 🪞 镜面翻转 | 🔄 AB循环
-            </p>
+        <!-- 视频播放器入口 -->
+        <div class="hero-link">
+            <a href="/static/video-player.html">🎬 进入增强视频播放器</a>
+            <p>⏱️ 播放速度调节 | 🪞 镜面翻转 | 🔄 AB循环 | ⌨️ 快捷键支持</p>
         </div>
         
+        <!-- 用户信息 -->
         <div class="user-info" id="userInfo">
-            <strong>已登录用户:</strong> <span id="userEmail"></span>
-            <button class="btn-logout" onclick="logout()">退出登录</button>
+            <strong>已登录:</strong> <span id="userPhone"></span>
+            <button class="btn-logout" onclick="handleLogout()">退出登录</button>
         </div>
         
-        <div class="tabs">
-            <button class="tab active" onclick="switchTab('login')">登录</button>
-            <button class="tab" onclick="switchTab('register')">注册</button>
-            <button class="tab" onclick="switchTab('videos')">视频列表</button>
-            <button class="tab" onclick="switchTab('upload')">上传视频</button>
+        <!-- 内容区标签 -->
+        <div class="tabs" id="mainTabs" style="display: none;">
+            <button class="tab active" onclick="switchMainTab('videos')">📹 我的视频</button>
+            <button class="tab" onclick="switchMainTab('upload')">⬆️ 上传视频</button>
         </div>
         
-        <!-- 登录表单 -->
-        <div id="loginTab" class="tab-content active auth-section">
-            <div class="message" id="loginMessage"></div>
-            <form onsubmit="login(event)">
-                <div class="form-group">
-                    <label for="loginEmail">邮箱</label>
-                    <input type="email" id="loginEmail" required placeholder="your@email.com">
-                </div>
-                <div class="form-group">
-                    <label for="loginPassword">密码</label>
-                    <input type="password" id="loginPassword" required placeholder="请输入密码">
-                </div>
-                <button type="submit">登录</button>
-            </form>
-        </div>
-        
-        <!-- 注册表单 -->
-        <div id="registerTab" class="tab-content auth-section">
-            <div class="message" id="registerMessage"></div>
-            <form onsubmit="register(event)">
-                <div class="form-group">
-                    <label for="registerEmail">邮箱</label>
-                    <input type="email" id="registerEmail" required placeholder="your@email.com">
-                </div>
-                <div class="form-group">
-                    <label for="registerFirstName">名字</label>
-                    <input type="text" id="registerFirstName" required placeholder="名">
-                </div>
-                <div class="form-group">
-                    <label for="registerLastName">姓氏</label>
-                    <input type="text" id="registerLastName" required placeholder="姓">
-                </div>
-                <div class="form-group">
-                    <label for="registerPassword">密码</label>
-                    <input type="password" id="registerPassword" required placeholder="至少6位">
-                </div>
-                <button type="submit">注册</button>
-            </form>
+        <!-- 认证区域 -->
+        <div id="authSection">
+            <div class="auth-tabs">
+                <button class="tab active" onclick="switchAuthTab('login')">登录</button>
+                <button class="tab" onclick="switchAuthTab('register')">注册</button>
+            </div>
+            
+            <!-- 登录表单 -->
+            <div id="loginTab" class="auth-section show">
+                <div class="message" id="loginMessage"></div>
+                <form onsubmit="handleLogin(event)">
+                    <div class="form-group">
+                        <label for="loginPhone">手机号</label>
+                        <div class="phone-input-group">
+                            <input type="tel" id="loginPhone" required placeholder="请输入11位手机号" maxlength="11" pattern="[0-9]{11}">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="loginPassword">密码</label>
+                        <input type="password" id="loginPassword" required placeholder="请输入密码">
+                    </div>
+                    <button type="submit">登录</button>
+                </form>
+            </div>
+            
+            <!-- 注册表单 -->
+            <div id="registerTab" class="auth-section">
+                <div class="message" id="registerMessage"></div>
+                <form onsubmit="handleRegister(event)">
+                    <div class="form-group">
+                        <label for="registerPhone">手机号</label>
+                        <div class="phone-input-group">
+                            <input type="tel" id="registerPhone" required placeholder="请输入11位手机号" maxlength="11" pattern="[0-9]{11}">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="registerFirstName">名字</label>
+                        <input type="text" id="registerFirstName" required placeholder="名">
+                    </div>
+                    <div class="form-group">
+                        <label for="registerLastName">姓氏</label>
+                        <input type="text" id="registerLastName" required placeholder="姓">
+                    </div>
+                    <div class="form-group">
+                        <label for="registerPassword">密码</label>
+                        <input type="password" id="registerPassword" required placeholder="至少6位">
+                    </div>
+                    <button type="submit">注册</button>
+                </form>
+            </div>
         </div>
         
         <!-- 视频列表 -->
-        <div id="videosTab" class="tab-content">
+        <div id="videosTab" class="tab-content" style="display: none;">
             <div class="message" id="videosMessage"></div>
-            <div class="loading" id="videosLoading">加载中...</div>
+            <div class="loading" id="videosLoading">加载中</div>
             <div class="video-list" id="videoList"></div>
         </div>
         
         <!-- 上传视频 -->
-        <div id="uploadTab" class="tab-content">
+        <div id="uploadTab" class="tab-content" style="display: none;">
             <div class="message" id="uploadMessage"></div>
-            <form onsubmit="uploadVideo(event)">
+            <form onsubmit="handleUpload(event)">
                 <div class="form-group">
                     <label for="videoTitle">视频标题</label>
                     <input type="text" id="videoTitle" required placeholder="给您的舞蹈视频起个名字">
@@ -336,36 +205,49 @@
                         <p id="fileName" style="margin-top: 10px; color: #667eea;"></p>
                     </div>
                 </div>
-                <button type="submit">上传视频</button>
+                <!-- 上传进度条 -->
+                <div id="uploadProgress" style="display: none; margin-bottom: 20px;">
+                    <div style="background: #e0e0e0; border-radius: 10px; overflow: hidden; height: 30px;">
+                        <div id="progressBar" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); height: 100%; width: 0%; transition: width 0.3s; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">
+                            <span id="progressText">0%</span>
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" id="uploadBtn">上传视频</button>
             </form>
         </div>
     </div>
     
+    <!-- 引入 JS 文件 -->
+    <script src="/static/js/utils.js"></script>
+    <script src="/static/js/api.js"></script>
     <script>
-        const API_BASE = 'http://localhost:8080/api/v1';
-        let token = localStorage.getItem('token');
-        let currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-        
         // 初始化
         window.onload = function() {
             updateAuthUI();
-            if (token) {
+            if (DanceMirrorAPI.isLoggedIn()) {
                 loadVideos();
             }
         };
         
-        // 切换标签
-        function switchTab(tabName) {
-            // 更新标签样式
-            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+        // 切换认证标签
+        function switchAuthTab(tabName) {
+            document.querySelectorAll('.auth-tabs .tab').forEach(tab => tab.classList.remove('active'));
             event.target.classList.add('active');
             
-            // 显示对应内容
-            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-            document.getElementById(tabName + 'Tab').classList.add('active');
+            document.querySelectorAll('.auth-section').forEach(section => section.classList.remove('show'));
+            document.getElementById(tabName + 'Tab').classList.add('show');
+        }
+        
+        // 切换主标签
+        function switchMainTab(tabName) {
+            document.querySelectorAll('#mainTabs .tab').forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
             
-            // 如果切换到视频列表，加载视频
-            if (tabName === 'videos' && token) {
+            document.querySelectorAll('.tab-content').forEach(content => content.style.display = 'none');
+            document.getElementById(tabName + 'Tab').style.display = 'block';
+            
+            if (tabName === 'videos') {
                 loadVideos();
             }
         }
@@ -373,135 +255,108 @@
         // 更新认证UI
         function updateAuthUI() {
             const userInfo = document.getElementById('userInfo');
-            const authSections = document.querySelectorAll('.auth-section');
+            const authSection = document.getElementById('authSection');
+            const mainTabs = document.getElementById('mainTabs');
+            const currentUser = DanceMirrorAPI.getCurrentUser();
             
-            if (token && currentUser.email) {
+            if (DanceMirrorAPI.isLoggedIn() && currentUser) {
                 userInfo.classList.add('show');
-                document.getElementById('userEmail').textContent = currentUser.email;
-                authSections.forEach(section => section.classList.remove('show'));
+                document.getElementById('userPhone').textContent = currentUser.phone || currentUser.email || '用户';
+                authSection.style.display = 'none';
+                mainTabs.style.display = 'flex';
+                document.getElementById('videosTab').style.display = 'block';
             } else {
                 userInfo.classList.remove('show');
-                authSections.forEach(section => section.classList.add('show'));
+                authSection.style.display = 'block';
+                mainTabs.style.display = 'none';
+                document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
             }
         }
         
-        // 显示消息
-        function showMessage(elementId, message, type) {
-            const msgEl = document.getElementById(elementId);
-            msgEl.textContent = message;
-            msgEl.className = `message ${type}`;
-            msgEl.style.display = 'block';
-            setTimeout(() => msgEl.style.display = 'none', 5000);
-        }
-        
-        // 注册
-        async function register(event) {
+        // 处理登录
+        async function handleLogin(event) {
             event.preventDefault();
             
-            const email = document.getElementById('registerEmail').value;
+            const phone = document.getElementById('loginPhone').value;
+            const password = document.getElementById('loginPassword').value;
+            
+            // 验证手机号格式
+            if (!/^1[3-9]\d{9}$/.test(phone)) {
+                Utils.showMessage('loginMessage', '请输入正确的手机号', 'error');
+                return;
+            }
+            
+            try {
+                await DanceMirrorAPI.login(phone, password);
+                Utils.showMessage('loginMessage', '登录成功！', 'success');
+                updateAuthUI();
+                loadVideos();
+            } catch (error) {
+                Utils.showMessage('loginMessage', '登录失败: ' + error.message, 'error');
+            }
+        }
+        
+        // 处理注册
+        async function handleRegister(event) {
+            event.preventDefault();
+            
+            const phone = document.getElementById('registerPhone').value;
             const firstName = document.getElementById('registerFirstName').value;
             const lastName = document.getElementById('registerLastName').value;
             const password = document.getElementById('registerPassword').value;
             
+            // 验证手机号格式
+            if (!/^1[3-9]\d{9}$/.test(phone)) {
+                Utils.showMessage('registerMessage', '请输入正确的手机号', 'error');
+                return;
+            }
+            
+            // 验证密码
+            const passwordCheck = Utils.validatePassword(password);
+            if (!passwordCheck.valid) {
+                Utils.showMessage('registerMessage', passwordCheck.message, 'error');
+                return;
+            }
+            
             try {
-                const response = await fetch(`${API_BASE}/register`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, firstName, lastName, password })
-                });
-                
-                const data = await response.json();
-                
-                if (response.ok) {
-                    showMessage('registerMessage', '注册成功！请登录', 'success');
-                    setTimeout(() => switchTab('login'), 1500);
-                } else {
-                    showMessage('registerMessage', data.error || '注册失败', 'error');
-                }
+                await DanceMirrorAPI.register(phone, firstName, lastName, password);
+                Utils.showMessage('registerMessage', '注册成功！正在跳转...', 'success');
+                updateAuthUI();
+                loadVideos();
             } catch (error) {
-                showMessage('registerMessage', '网络错误: ' + error.message, 'error');
+                Utils.showMessage('registerMessage', '注册失败: ' + error.message, 'error');
             }
         }
         
-        // 登录
-        async function login(event) {
-            event.preventDefault();
-            
-            const email = document.getElementById('loginEmail').value;
-            const password = document.getElementById('loginPassword').value;
-            
-            try {
-                const response = await fetch(`${API_BASE}/login`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password })
-                });
-                
-                const data = await response.json();
-                
-                if (response.ok && data.token) {
-                    token = data.token;
-                    currentUser = { email };
-                    localStorage.setItem('token', token);
-                    localStorage.setItem('user', JSON.stringify(currentUser));
-                    
-                    showMessage('loginMessage', '登录成功！', 'success');
-                    updateAuthUI();
-                    setTimeout(() => switchTab('videos'), 1000);
-                } else {
-                    showMessage('loginMessage', data.error || '登录失败', 'error');
-                }
-            } catch (error) {
-                showMessage('loginMessage', '网络错误: ' + error.message, 'error');
-            }
-        }
-        
-        // 退出登录
-        function logout() {
-            token = null;
-            currentUser = {};
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
+        // 处理退出登录
+        function handleLogout() {
+            DanceMirrorAPI.logout();
             updateAuthUI();
-            switchTab('login');
+            Utils.showMessage('loginMessage', '已退出登录', 'success');
         }
         
         // 加载视频列表
         async function loadVideos() {
-            if (!token) {
-                showMessage('videosMessage', '请先登录', 'error');
-                return;
-            }
-            
-            const loadingEl = document.getElementById('videosLoading');
             const listEl = document.getElementById('videoList');
+            const loadingEl = document.getElementById('videosLoading');
             
             loadingEl.style.display = 'block';
             listEl.innerHTML = '';
             
             try {
-                const response = await fetch(`${API_BASE}/videos`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                
-                const videos = await response.json();
+                const videos = await DanceMirrorAPI.getVideos();
                 loadingEl.style.display = 'none';
                 
-                if (response.ok) {
-                    if (videos.length === 0) {
-                        listEl.innerHTML = '<p style="text-align:center;color:#666;">还没有视频，快去上传第一个吧！</p>';
-                    } else {
-                        videos.forEach(video => {
-                            const card = createVideoCard(video);
-                            listEl.appendChild(card);
-                        });
-                    }
+                if (videos && videos.length > 0) {
+                    videos.forEach(video => {
+                        listEl.appendChild(createVideoCard(video));
+                    });
                 } else {
-                    showMessage('videosMessage', videos.error || '加载失败', 'error');
+                    listEl.innerHTML = '<p style="text-align:center;color:#666;">暂无视频，快去上传第一个视频吧！</p>';
                 }
             } catch (error) {
                 loadingEl.style.display = 'none';
-                showMessage('videosMessage', '网络错误: ' + error.message, 'error');
+                Utils.showMessage('videosMessage', '加载失败: ' + error.message, 'error');
             }
         }
         
@@ -509,73 +364,106 @@
         function createVideoCard(video) {
             const card = document.createElement('div');
             card.className = 'video-card';
-            card.innerHTML = `
-                <h3>${video.title}</h3>
-                <p>${video.description || '暂无描述'}</p>
-                <video controls>
-                    <source src="/${video.filePath}" type="video/mp4">
-                    您的浏览器不支持视频播放
-                </video>
-                <p style="font-size:12px;color:#999;">
-                    上传于: ${new Date(video.createdAt).toLocaleString()}
-                </p>
-            `;
+            
+            const title = document.createElement('h3');
+            title.textContent = video.title;
+            
+            const desc = document.createElement('p');
+            desc.textContent = video.description || '暂无描述';
+            
+            const videoEl = document.createElement('video');
+            videoEl.src = `/${video.filePath}`;
+            videoEl.controls = true;
+            
+            const date = document.createElement('p');
+            date.style.fontSize = '12px';
+            date.style.color = '#999';
+            date.textContent = Utils.formatDate(video.createdAt);
+            
+            const deleteBtn = document.createElement('button');
+            deleteBtn.textContent = '删除';
+            deleteBtn.style.background = '#dc3545';
+            deleteBtn.style.marginTop = '10px';
+            deleteBtn.onclick = () => deleteVideo(video.id);
+            
+            card.appendChild(title);
+            card.appendChild(desc);
+            card.appendChild(videoEl);
+            card.appendChild(date);
+            card.appendChild(deleteBtn);
+            
             return card;
+        }
+        
+        // 删除视频
+        async function deleteVideo(id) {
+            if (!confirm('确定要删除这个视频吗？')) return;
+            
+            try {
+                await DanceMirrorAPI.deleteVideo(id);
+                Utils.showMessage('videosMessage', '删除成功', 'success');
+                loadVideos();
+            } catch (error) {
+                Utils.showMessage('videosMessage', '删除失败: ' + error.message, 'error');
+            }
         }
         
         // 显示文件名
         function displayFileName() {
-            const fileInput = document.getElementById('videoFile');
-            const fileNameDisplay = document.getElementById('fileName');
-            if (fileInput.files.length > 0) {
-                fileNameDisplay.textContent = `已选择: ${fileInput.files[0].name}`;
+            const file = document.getElementById('videoFile').files[0];
+            const fileNameEl = document.getElementById('fileName');
+            
+            if (file) {
+                fileNameEl.textContent = `已选择: ${file.name} (${Utils.formatFileSize(file.size)})`;
             }
         }
         
-        // 上传视频
-        async function uploadVideo(event) {
+        // 处理视频上传
+        async function handleUpload(event) {
             event.preventDefault();
-            
-            if (!token) {
-                showMessage('uploadMessage', '请先登录', 'error');
-                return;
-            }
             
             const title = document.getElementById('videoTitle').value;
             const description = document.getElementById('videoDescription').value;
-            const fileInput = document.getElementById('videoFile');
+            const file = document.getElementById('videoFile').files[0];
             
-            if (!fileInput.files[0]) {
-                showMessage('uploadMessage', '请选择视频文件', 'error');
+            if (!file) {
+                Utils.showMessage('uploadMessage', '请选择视频文件', 'error');
                 return;
             }
             
-            const formData = new FormData();
-            formData.append('title', title);
-            formData.append('description', description);
-            formData.append('video', fileInput.files[0]);
+            const uploadBtn = document.getElementById('uploadBtn');
+            const progressDiv = document.getElementById('uploadProgress');
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = '上传中...';
+            progressDiv.style.display = 'block';
             
             try {
-                showMessage('uploadMessage', '上传中，请稍候...', 'success');
-                
-                const response = await fetch(`${API_BASE}/videos/upload`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` },
-                    body: formData
+                await DanceMirrorAPI.uploadVideo(title, description, file, (percent) => {
+                    const rounded = Math.round(percent);
+                    progressBar.style.width = rounded + '%';
+                    progressText.textContent = rounded + '%';
                 });
                 
-                const data = await response.json();
+                Utils.showMessage('uploadMessage', '上传成功！', 'success');
                 
-                if (response.ok) {
-                    showMessage('uploadMessage', '上传成功！', 'success');
-                    event.target.reset();
-                    document.getElementById('fileName').textContent = '';
-                    setTimeout(() => switchTab('videos'), 1500);
-                } else {
-                    showMessage('uploadMessage', data.error || '上传失败', 'error');
-                }
+                // 重置表单
+                event.target.reset();
+                document.getElementById('fileName').textContent = '';
+                progressDiv.style.display = 'none';
+                
+                // 切换到视频列表
+                setTimeout(() => {
+                    switchMainTab('videos');
+                    document.querySelector('#mainTabs .tab:first-child').click();
+                }, 1500);
             } catch (error) {
-                showMessage('uploadMessage', '网络错误: ' + error.message, 'error');
+                Utils.showMessage('uploadMessage', '上传失败: ' + error.message, 'error');
+            } finally {
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = '上传视频';
             }
         }
     </script>

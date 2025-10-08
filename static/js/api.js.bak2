@@ -1,0 +1,128 @@
+const DanceMirrorAPI = (function() {
+    const config = {
+        apiBase: window.location.origin + '/api/v1',
+        tokenKey: 'dancemirror_token',
+        userKey: 'dancemirror_user'
+    };
+
+    function getToken() {
+        return localStorage.getItem(config.tokenKey);
+    }
+
+    function setToken(token) {
+        localStorage.setItem(config.tokenKey, token);
+    }
+
+    function clearToken() {
+        localStorage.removeItem(config.tokenKey);
+        localStorage.removeItem(config.userKey);
+    }
+
+    function getCurrentUser() {
+        const userStr = localStorage.getItem(config.userKey);
+        return userStr ? JSON.parse(userStr) : null;
+    }
+
+    function setCurrentUser(user) {
+        localStorage.setItem(config.userKey, JSON.stringify(user));
+    }
+
+    async function request(endpoint, options = {}) {
+        const url = `${config.apiBase}${endpoint}`;
+        const token = getToken();
+        
+        const headers = { ...options.headers };
+        
+        if (token && !options.skipAuth) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        if (!(options.body instanceof FormData) && options.body) {
+            headers['Content-Type'] = 'application/json';
+        }
+        
+        const fetchConfig = { ...options, headers };
+        
+        try {
+            console.log('发送请求:', url, fetchConfig);
+            const response = await fetch(url, fetchConfig);
+            console.log('响应状态:', response.status, response.statusText);
+            
+            if (response.status === 401) {
+                clearToken();
+                throw new Error('登录已过期，请重新登录');
+            }
+            
+            // 获取响应文本
+            const responseText = await response.text();
+            console.log('响应内容:', responseText);
+            
+            // 尝试解析 JSON
+            let data;
+            try {
+                data = JSON.parse(responseText);
+            } catch (e) {
+                // 如果不是 JSON，直接返回文本
+                data = { text: responseText };
+            }
+            
+            if (!response.ok) {
+                const errorMsg = data.error || data.message || responseText || `请求失败 (${response.status})`;
+                console.error('请求失败:', errorMsg);
+                throw new Error(errorMsg);
+            }
+            
+            return data;
+        } catch (error) {
+            console.error('API 请求错误:', error);
+            // 如果是网络错误，提供更友好的提示
+            if (error.message === 'Failed to fetch' || error.message === 'Load failed') {
+                throw new Error('网络连接失败，请检查网络后重试');
+            }
+            throw error;
+        }
+    }
+
+    return {
+        async register(phone, firstName, lastName, password) {
+            const data = await request('/register', {
+                method: 'POST',
+                body: JSON.stringify({ phone, firstName, lastName, password }),
+                skipAuth: true
+            });
+            
+            if (data.token) {
+                setToken(data.token);
+                setCurrentUser({ phone, firstName, lastName });
+            }
+            
+            return data;
+        },
+
+        async login(phone, password) {
+            const data = await request('/login', {
+                method: 'POST',
+                body: JSON.stringify({ phone, password }),
+                skipAuth: true
+            });
+            
+            if (data.token) {
+                setToken(data.token);
+                setCurrentUser({ phone });
+            }
+            
+            return data;
+        },
+
+        logout() {
+            clearToken();
+        },
+
+        isLoggedIn() {
+            return !!getToken();
+        },
+
+        getCurrentUser,
+        getToken
+    };
+})();

@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>移动端测试 - DanceMirror</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 10px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: #667eea;
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .test-section {
+            margin-bottom: 30px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+        
+        .test-section h2 {
+            font-size: 1.2em;
+            color: #333;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .status {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ccc;
+        }
+        
+        .status.success { background: #28a745; }
+        .status.error { background: #dc3545; }
+        
+        .btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            margin-top: 10px;
+            cursor: pointer;
+        }
+        
+        .btn:active {
+            opacity: 0.8;
+        }
+        
+        .info {
+            font-size: 14px;
+            color: #666;
+            margin-top: 10px;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+            word-break: break-all;
+        }
+        
+        .video-container {
+            margin-top: 15px;
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        video {
+            width: 100%;
+            display: block;
+        }
+        
+        .mirror-toggle {
+            background: #6c757d;
+            margin-top: 10px;
+        }
+        
+        video.mirrored {
+            transform: scaleX(-1);
+        }
+        
+        input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        
+        .log {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+            padding: 8px;
+            background: #fff;
+            border-radius: 5px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 DanceMirror 移动端测试</h1>
+        
+        <!-- 1. 登录测试 -->
+        <div class="test-section">
+            <h2>
+                <span class="status" id="loginStatus"></span>
+                1. 登录状态
+            </h2>
+            <div class="info" id="loginInfo">检测中...</div>
+            <button class="btn" onclick="testLogin()">测试登录</button>
+        </div>
+        
+        <!-- 2. 视频列表 -->
+        <div class="test-section">
+            <h2>
+                <span class="status" id="videosStatus"></span>
+                2. 视频列表
+            </h2>
+            <div class="info" id="videosInfo">点击按钮加载</div>
+            <button class="btn" onclick="testGetVideos()">加载视频列表</button>
+            <div class="log" id="videosLog" style="display:none;"></div>
+        </div>
+        
+        <!-- 3. 视频播放 & 镜像 -->
+        <div class="test-section">
+            <h2>
+                <span class="status" id="mirrorStatus"></span>
+                3. 视频播放 & 镜像
+            </h2>
+            <div class="video-container" id="videoContainer" style="display:none;">
+                <video id="testVideo" controls>
+                    <source src="" type="video/mp4">
+                </video>
+            </div>
+            <button class="btn mirror-toggle" onclick="toggleMirror()">切换镜像模式</button>
+            <div class="info" id="mirrorInfo">等待加载视频...</div>
+        </div>
+        
+        <!-- 4. 视频上传 -->
+        <div class="test-section">
+            <h2>
+                <span class="status" id="uploadStatus"></span>
+                4. 视频上传
+            </h2>
+            <input type="file" id="videoFile" accept="video/*">
+            <button class="btn" onclick="testUpload()">测试上传</button>
+            <div class="info" id="uploadInfo">请选择视频文件</div>
+            <div class="log" id="uploadLog" style="display:none;"></div>
+        </div>
+        
+        <!-- 5. 屏幕适配 -->
+        <div class="test-section">
+            <h2>
+                <span class="status success" id="screenStatus"></span>
+                5. 屏幕适配
+            </h2>
+            <div class="info">
+                <strong>屏幕尺寸:</strong> <span id="screenSize"></span><br>
+                <strong>视口尺寸:</strong> <span id="viewportSize"></span><br>
+                <strong>设备像素比:</strong> <span id="devicePixelRatio"></span><br>
+                <strong>触摸支持:</strong> <span id="touchSupport"></span>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/js/api.js"></script>
+    <script>
+        // 初始化屏幕信息
+        document.getElementById('screenSize').textContent = `${screen.width} × ${screen.height}`;
+        document.getElementById('viewportSize').textContent = `${window.innerWidth} × ${window.innerHeight}`;
+        document.getElementById('devicePixelRatio').textContent = window.devicePixelRatio || 1;
+        document.getElementById('touchSupport').textContent = 'ontouchstart' in window ? '✅ 是' : '❌ 否';
+        
+        // 1. 检查登录状态
+        function checkLoginStatus() {
+            const isLoggedIn = DanceMirrorAPI.isLoggedIn();
+            const token = DanceMirrorAPI.getToken();
+            const user = DanceMirrorAPI.getCurrentUser();
+            
+            document.getElementById('loginStatus').className = `status ${isLoggedIn ? 'success' : 'error'}`;
+            document.getElementById('loginInfo').innerHTML = isLoggedIn 
+                ? `✅ 已登录<br>用户: ${user?.phone || '未知'}<br>Token: ${token?.substring(0, 30)}...`
+                : '❌ 未登录，请先在主页登录';
+            
+            return isLoggedIn;
+        }
+        
+        // 测试登录
+        async function testLogin() {
+            const phone = prompt('请输入手机号:', '13900139000');
+            if (!phone) return;
+            
+            const password = prompt('请输入密码:', 'Test123456');
+            if (!password) return;
+            
+            try {
+                await DanceMirrorAPI.login(phone, password);
+                checkLoginStatus();
+                alert('✅ 登录成功！');
+            } catch (error) {
+                alert('❌ 登录失败: ' + error.message);
+            }
+        }
+        
+        // 2. 测试获取视频列表
+        async function testGetVideos() {
+            const infoEl = document.getElementById('videosInfo');
+            const logEl = document.getElementById('videosLog');
+            const statusEl = document.getElementById('videosStatus');
+            
+            if (!checkLoginStatus()) {
+                alert('请先登录！');
+                return;
+            }
+            
+            infoEl.textContent = '加载中...';
+            logEl.style.display = 'block';
+            logEl.innerHTML = '';
+            
+            try {
+                console.log('开始获取视频列表...');
+                logEl.innerHTML += '📡 发起请求...<br>';
+                
+                const videos = await DanceMirrorAPI.getVideos();
+                
+                logEl.innerHTML += `✅ 请求成功<br>`;
+                logEl.innerHTML += `📦 数据: ${JSON.stringify(videos).substring(0, 100)}...<br>`;
+                
+                statusEl.className = 'status success';
+                infoEl.innerHTML = `✅ 加载成功<br>视频数量: ${videos.length}`;
+                
+                // 如果有视频，加载第一个到播放器
+                if (videos.length > 0) {
+                    const video = videos[0];
+                    const videoEl = document.getElementById('testVideo');
+                    videoEl.src = `/${video.filePath}`;
+                    document.getElementById('videoContainer').style.display = 'block';
+                    document.getElementById('mirrorInfo').textContent = `当前播放: ${video.title}`;
+                    document.getElementById('mirrorStatus').className = 'status success';
+                }
+            } catch (error) {
+                console.error('获取视频失败:', error);
+                logEl.innerHTML += `❌ 失败: ${error.message}<br>`;
+                statusEl.className = 'status error';
+                infoEl.innerHTML = `❌ 加载失败<br>${error.message}`;
+            }
+        }
+        
+        // 3. 切换镜像
+        function toggleMirror() {
+            const videoEl = document.getElementById('testVideo');
+            videoEl.classList.toggle('mirrored');
+            const isMirrored = videoEl.classList.contains('mirrored');
+            document.getElementById('mirrorInfo').textContent = isMirrored 
+                ? '🪞 镜像模式已开启' 
+                : '📹 正常模式';
+        }
+        
+        // 4. 测试上传
+        async function testUpload() {
+            const fileInput = document.getElementById('videoFile');
+            const infoEl = document.getElementById('uploadInfo');
+            const logEl = document.getElementById('uploadLog');
+            const statusEl = document.getElementById('uploadStatus');
+            
+            if (!checkLoginStatus()) {
+                alert('请先登录！');
+                return;
+            }
+            
+            if (!fileInput.files || !fileInput.files[0]) {
+                alert('请先选择视频文件！');
+                return;
+            }
+            
+            const file = fileInput.files[0];
+            logEl.style.display = 'block';
+            logEl.innerHTML = `📁 文件: ${file.name}<br>📊 大小: ${(file.size / 1024 / 1024).toFixed(2)} MB<br>`;
+            
+            infoEl.textContent = '上传中...';
+            
+            try {
+                await DanceMirrorAPI.uploadVideo(
+                    '移动端测试视频',
+                    '测试上传功能',
+                    file,
+                    (percent) => {
+                        infoEl.textContent = `上传进度: ${percent}%`;
+                    }
+                );
+                
+                statusEl.className = 'status success';
+                infoEl.innerHTML = '✅ 上传成功！';
+                logEl.innerHTML += '✅ 上传完成<br>';
+                alert('✅ 上传成功！');
+            } catch (error) {
+                console.error('上传失败:', error);
+                statusEl.className = 'status error';
+                infoEl.innerHTML = `❌ 上传失败<br>${error.message}`;
+                logEl.innerHTML += `❌ 失败: ${error.message}<br>`;
+            }
+        }
+        
+        // 页面加载时检查登录状态
+        window.onload = function() {
+            checkLoginStatus();
+        };
+    </script>
+</body>
+</html>

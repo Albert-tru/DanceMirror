@@ -34,7 +34,7 @@ func NewHandler(store types.VideoStore, userStore types.UserStore) *Handler {
 func (h *Handler) RegisterRoutes(router *mux.Router) {
 	// 所有这些路由都需要登录（通过 JWT 验证）
 	router.HandleFunc("/videos", auth.WithJWTAuth(h.handleGetVideos, h.userStore)).Methods(http.MethodGet)
-	router.HandleFunc("/videos/upload", auth.WithJWTAuth(h.handleUpload, h.userStore)).Methods(http.MethodPost)
+	router.HandleFunc("/videos", auth.WithJWTAuth(h.handleUpload, h.userStore)).Methods(http.MethodPost)
 	router.HandleFunc("/videos/{id}", auth.WithJWTAuth(h.handleGetVideo, h.userStore)).Methods(http.MethodGet)
 	router.HandleFunc("/videos/{id}", auth.WithJWTAuth(h.handleDeleteVideo, h.userStore)).Methods(http.MethodDelete)
 }
@@ -49,7 +49,7 @@ func (h *Handler) handleGetVideos(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 2. 查询数据库，获取该用户的所有视频
-	videos, err := h.store.GetVideosByUserID(userID)
+	videos, err := h.store.GetVideos(userID)
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, err)
 		return

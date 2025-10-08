@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="description" content="专业的舞蹈练习工具，支持视频镜像、变速播放、AB循环">
+    <meta name="keywords" content="舞蹈,扒舞,练习,镜像,视频">
+    <meta name="author" content="DanceMirror">
+    
+    <!-- PWA 核心配置 -->
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="DanceMirror">
+    
+    <!-- 图标 -->
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+    <link rel="manifest" href="/static/manifest.json">
+    
+    <title>DanceMirror - 舞蹈镜像平台</title>
+    
+    <!-- 样式 -->
+    <link rel="stylesheet" href="/static/css/common.css">
+    <link rel="stylesheet" href="/static/css/auth.css">
+    
+    <style>
+        /* PWA 安装状态指示器 */
+        .pwa-status {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 8px 15px;
+            background: rgba(102, 126, 234, 0.9);
+            color: white;
+            border-radius: 20px;
+            font-size: 12px;
+            z-index: 1000;
+            display: none;
+        }
+        
+        .pwa-status.installed {
+            background: rgba(76, 175, 80, 0.9);
+            display: block;
+        }
+        
+        /* 加载动画 */
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            transition: opacity 0.5s;
+        }
+        
+        .loading-screen.hide {
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        .loading-logo {
+            font-size: 80px;
+            margin-bottom: 20px;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+        }
+        
+        .loading-text {
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .loading-subtitle {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 14px;
+        }
+        
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-top: 30px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* 离线提示 */
+        .offline-banner {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: #ff9800;
+            color: white;
+            text-align: center;
+            padding: 10px;
+            z-index: 10000;
+            transform: translateY(-100%);
+            transition: transform 0.3s;
+        }
+        
+        .offline-banner.show {
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+    <!-- 加载画面 -->
+    <div class="loading-screen" id="loadingScreen">
+        <div class="loading-logo">💃</div>
+        <div class="loading-text">DanceMirror</div>
+        <div class="loading-subtitle">舞蹈镜像平台</div>
+        <div class="loading-spinner"></div>
+    </div>
+    
+    <!-- 离线提示 -->
+    <div class="offline-banner" id="offlineBanner">
+        ⚠️ 当前处于离线状态，部分功能可能不可用
+    </div>
+    
+    <!-- PWA 状态指示 -->
+    <div class="pwa-status" id="pwaStatus">📱 已安装</div>
+    
+    <!-- 主要内容（你原来的页面） -->
+    <div class="container">
+        <div class="hero-link">
+            <a href="/static/video-player.html">🎬 打开视频播放器</a>
+            <p>支持镜像、变速、AB循环等专业功能</p>
+        </div>
+
+        <!-- 简洁的认证标签 -->
+        <div class="auth-tabs">
+            <button class="tab active" onclick="switchTab('login')">登录</button>
+            <button class="tab" onclick="switchTab('register')">注册</button>
+        </div>
+
+        <!-- 登录表单 -->
+        <div class="auth-section show" id="loginSection">
+            <h2>欢迎回来</h2>
+            <form onsubmit="handleLogin(event)">
+                <div class="phone-input-group">
+                    <input type="tel" id="loginPhone" placeholder="手机号" required pattern="1[3-9]\d{9}">
+                </div>
+                <input type="password" id="loginPassword" placeholder="密码" required>
+                <button type="submit" class="btn-primary">登录</button>
+            </form>
+        </div>
+
+        <!-- 注册表单 -->
+        <div class="auth-section" id="registerSection">
+            <h2>创建账号</h2>
+            <form onsubmit="handleRegister(event)">
+                <input type="text" id="registerFirstName" placeholder="名字" required>
+                <input type="text" id="registerLastName" placeholder="姓氏" required>
+                <div class="phone-input-group">
+                    <input type="tel" id="registerPhone" placeholder="手机号" required pattern="1[3-9]\d{9}">
+                </div>
+                <input type="password" id="registerPassword" placeholder="密码 (至少6位)" required minlength="6">
+                <button type="submit" class="btn-primary">注册</button>
+            </form>
+        </div>
+
+        <!-- 用户视频列表 -->
+        <div class="video-section" id="videoSection" style="display: none;">
+            <div class="user-info">
+                <h2>我的视频</h2>
+                <button onclick="handleLogout()" class="btn-secondary">退出登录</button>
+            </div>
+            
+            <div class="upload-section">
+                <h3>上传视频</h3>
+                <form onsubmit="handleUpload(event)">
+                    <input type="text" id="videoTitle" placeholder="视频标题" required>
+                    <textarea id="videoDescription" placeholder="视频描述"></textarea>
+                    <input type="file" id="videoFile" accept="video/*" required>
+                    <div class="upload-progress" id="uploadProgress" style="display: none;">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <div class="progress-text" id="progressText">0%</div>
+                    </div>
+                    <button type="submit" class="btn-primary">上传</button>
+                </form>
+            </div>
+
+            <div class="video-list" id="videoList">
+                <p>加载中...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 脚本加载 -->
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/utils.js"></script>
+    <script src="/static/js/pwa-installer.js"></script>
+    
+    <script>
+        // PWA 初始化
+        window.addEventListener('load', () => {
+            // 隐藏加载画面
+            setTimeout(() => {
+                document.getElementById('loadingScreen').classList.add('hide');
+            }, 1000);
+            
+            // 检查 PWA 安装状态
+            if (window.matchMedia('(display-mode: standalone)').matches) {
+                document.getElementById('pwaStatus').classList.add('installed');
+            }
+            
+            // 检查网络状态
+            updateOnlineStatus();
+            window.addEventListener('online', updateOnlineStatus);
+            window.addEventListener('offline', updateOnlineStatus);
+            
+            // 检查登录状态
+            checkAuth();
+        });
+        
+        function updateOnlineStatus() {
+            const banner = document.getElementById('offlineBanner');
+            if (navigator.onLine) {
+                banner.classList.remove('show');
+            } else {
+                banner.classList.add('show');
+            }
+        }
+        
+        function switchTab(tab) {
+            // 切换标签高亮
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // 显示对应表单
+            document.getElementById('loginSection').classList.toggle('show', tab === 'login');
+            document.getElementById('registerSection').classList.toggle('show', tab === 'register');
+        }
+        
+        // 登录处理
+        async function handleLogin(e) {
+            e.preventDefault();
+            const phone = document.getElementById('loginPhone').value;
+            const password = document.getElementById('loginPassword').value;
+            
+            try {
+                const data = await api.login(phone, password);
+                localStorage.setItem('token', data.token);
+                localStorage.setItem('user', JSON.stringify(data.user));
+                showVideoSection();
+            } catch (error) {
+                alert('登录失败: ' + error.message);
+            }
+        }
+        
+        // 注册处理
+        async function handleRegister(e) {
+            e.preventDefault();
+            const firstName = document.getElementById('registerFirstName').value;
+            const lastName = document.getElementById('registerLastName').value;
+            const phone = document.getElementById('registerPhone').value;
+            const password = document.getElementById('registerPassword').value;
+            
+            try {
+                await api.register(phone, firstName, lastName, password);
+                alert('注册成功！请登录');
+                switchTab('login');
+            } catch (error) {
+                alert('注册失败: ' + error.message);
+            }
+        }
+        
+        // 上传处理
+        async function handleUpload(e) {
+            e.preventDefault();
+            const title = document.getElementById('videoTitle').value;
+            const description = document.getElementById('videoDescription').value;
+            const file = document.getElementById('videoFile').files[0];
+            
+            if (!file) {
+                alert('请选择视频文件');
+                return;
+            }
+            
+            // 显示进度条
+            document.getElementById('uploadProgress').style.display = 'block';
+            
+            try {
+                await api.uploadVideo(file, title, description, (percent) => {
+                    document.getElementById('progressFill').style.width = percent + '%';
+                    document.getElementById('progressText').textContent = Math.round(percent) + '%';
+                });
+                
+                alert('上传成功！');
+                e.target.reset();
+                document.getElementById('uploadProgress').style.display = 'none';
+                loadVideos();
+            } catch (error) {
+                alert('上传失败: ' + error.message);
+                document.getElementById('uploadProgress').style.display = 'none';
+            }
+        }
+        
+        // 加载视频列表
+        async function loadVideos() {
+            try {
+                const videos = await api.getVideos();
+                const listEl = document.getElementById('videoList');
+                
+                if (videos.length === 0) {
+                    listEl.innerHTML = '<p>暂无视频</p>';
+                    return;
+                }
+                
+                listEl.innerHTML = videos.map(video => `
+                    <div class="video-card">
+                        <h4>${video.title}</h4>
+                        <p>${video.description || '暂无描述'}</p>
+                        <small>${new Date(video.createdAt).toLocaleString('zh-CN')}</small>
+                        <button onclick="playVideo('${video.id}')">播放</button>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('加载视频失败:', error);
+            }
+        }
+        
+        function playVideo(id) {
+            window.location.href = `/static/video-player.html?id=${id}`;
+        }
+        
+        function showVideoSection() {
+            document.querySelector('.auth-tabs').style.display = 'none';
+            document.getElementById('loginSection').style.display = 'none';
+            document.getElementById('registerSection').style.display = 'none';
+            document.getElementById('videoSection').style.display = 'block';
+            loadVideos();
+        }
+        
+        function handleLogout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            location.reload();
+        }
+        
+        function checkAuth() {
+            const token = localStorage.getItem('token');
+            if (token) {
+                showVideoSection();
+            }
+        }
+    </script>
+</body>
+</html>

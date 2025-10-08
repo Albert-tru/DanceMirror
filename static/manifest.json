@@ -1,0 +1,25 @@
+{
+  "name": "DanceMirror - 舞蹈镜像平台",
+  "short_name": "DanceMirror",
+  "description": "专业的舞蹈练习工具，支持视频镜像、变速播放、AB循环",
+  "start_url": "/static/index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#667eea",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/static/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

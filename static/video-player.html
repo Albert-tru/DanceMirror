@@ -3,287 +3,89 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DanceMirror - 增强视频播放器</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }
-        
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 20px;
-            padding: 30px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-        }
-        
-        h1 {
-            color: #667eea;
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        
-        .player-section {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 30px;
-            margin-bottom: 30px;
-        }
-        
-        .video-container {
-            position: relative;
-            background: #000;
-            border-radius: 12px;
-            overflow: hidden;
-        }
-        
-        video {
-            width: 100%;
-            display: block;
-            transition: transform 0.3s;
-        }
-        
-        video.mirrored {
-            transform: scaleX(-1);
-        }
-        
-        .controls-panel {
-            background: #f8f9fa;
-            border-radius: 12px;
-            padding: 20px;
-        }
-        
-        .control-group {
-            margin-bottom: 20px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid #dee2e6;
-        }
-        
-        .control-group:last-child {
-            border-bottom: none;
-        }
-        
-        .control-group h3 {
-            color: #333;
-            margin-bottom: 15px;
-            font-size: 16px;
-        }
-        
-        .speed-buttons {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 8px;
-        }
-        
-        .btn {
-            padding: 10px;
-            border: 2px solid #667eea;
-            background: white;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.2s;
-            font-size: 14px;
-            font-weight: 500;
-        }
-        
-        .btn:hover {
-            background: #667eea;
-            color: white;
-        }
-        
-        .btn.active {
-            background: #667eea;
-            color: white;
-        }
-        
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            width: 100%;
-            padding: 12px;
-            margin-top: 10px;
-        }
-        
-        .btn-secondary {
-            background: #6c757d;
-            color: white;
-            border: none;
-        }
-        
-        .btn-success {
-            background: #28a745;
-            color: white;
-            border: none;
-        }
-        
-        .ab-loop-info {
-            background: #e7f3ff;
-            padding: 10px;
-            border-radius: 8px;
-            margin-top: 10px;
-            font-size: 14px;
-        }
-        
-        .video-list {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-            gap: 20px;
-        }
-        
-        .video-item {
-            border: 2px solid #e0e0e0;
-            border-radius: 12px;
-            padding: 15px;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        
-        .video-item:hover {
-            border-color: #667eea;
-            transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-        }
-        
-        .video-item.active {
-            border-color: #667eea;
-            background: #f8f9ff;
-        }
-        
-        .video-item h4 {
-            color: #333;
-            margin-bottom: 8px;
-        }
-        
-        .video-item p {
-            color: #666;
-            font-size: 13px;
-        }
-        
-        .message {
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            display: none;
-        }
-        
-        .message.error {
-            background: #f8d7da;
-            color: #721c24;
-        }
-        
-        .message.success {
-            background: #d4edda;
-            color: #155724;
-        }
-        
-        .back-btn {
-            display: inline-block;
-            padding: 10px 20px;
-            background: #6c757d;
-            color: white;
-            text-decoration: none;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-        
-        .back-btn:hover {
-            background: #5a6268;
-        }
-    </style>
+    <title>视频播放器 - DanceMirror</title>
+    <link rel="stylesheet" href="/static/css/common.css">
+    <link rel="stylesheet" href="/static/css/video-player.css">
 </head>
 <body>
     <div class="container">
-        <a href="index.html" class="back-btn">← 返回主页</a>
+        <a href="/static/index.html" class="nav-link">← 返回首页</a>
+        
         <h1>🎬 增强视频播放器</h1>
+        <p class="subtitle">专业舞蹈学习工具</p>
         
         <div class="message" id="message"></div>
         
-        <div class="player-section">
-            <div>
-                <div class="video-container">
-                    <video id="videoPlayer" controls crossorigin="anonymous">
-                        <source src="" type="video/mp4">
-                        您的浏览器不支持视频播放
-                    </video>
-                </div>
-                <div style="margin-top: 15px;">
-                    <h3 id="videoTitle">选择一个视频开始播放</h3>
-                    <p id="videoDescription" style="color: #666;"></p>
+        <!-- 视频播放区 -->
+        <div class="video-container">
+            <video id="videoPlayer" class="video-player" controls>
+                <source src="" type="video/mp4">
+                您的浏览器不支持视频播放
+            </video>
+        </div>
+        
+        <!-- 视频信息 -->
+        <div class="video-info">
+            <h2 id="videoTitle">请选择视频</h2>
+            <p id="videoDescription">暂无描述</p>
+        </div>
+        
+        <!-- 控制面板 -->
+        <div class="controls-panel">
+            <div class="control-group">
+                <h3>⏱️ 播放速度</h3>
+                <div class="speed-buttons">
+                    <button class="btn" onclick="setSpeed(0.5)">0.5x</button>
+                    <button class="btn" onclick="setSpeed(0.6)">0.6x</button>
+                    <button class="btn" onclick="setSpeed(0.7)">0.7x</button>
+                    <button class="btn" onclick="setSpeed(0.8)">0.8x</button>
+                    <button class="btn" onclick="setSpeed(0.9)">0.9x</button>
+                    <button class="btn active" onclick="setSpeed(1.0)">1.0x</button>
+                    <button class="btn" onclick="setSpeed(1.1)">1.1x</button>
+                    <button class="btn" onclick="setSpeed(1.2)">1.2x</button>
+                    <button class="btn" onclick="setSpeed(1.3)">1.3x</button>
+                    <button class="btn" onclick="setSpeed(1.4)">1.4x</button>
+                    <button class="btn" onclick="setSpeed(1.5)">1.5x</button>
                 </div>
             </div>
             
-            <div class="controls-panel">
-                <!-- 播放速度控制 -->
-                <div class="control-group">
-                    <h3>⏱️ 播放速度</h3>
-                    <div class="speed-buttons">
-                        <button class="btn" onclick="setSpeed(0.5)">0.5x</button>
-                        <button class="btn" onclick="setSpeed(0.6)">0.6x</button>
-                        <button class="btn" onclick="setSpeed(0.7)">0.7x</button>
-                        <button class="btn" onclick="setSpeed(0.8)">0.8x</button>
-                        <button class="btn" onclick="setSpeed(0.9)">0.9x</button>
-                        <button class="btn active" onclick="setSpeed(1.0)">1.0x</button>
-                        <button class="btn" onclick="setSpeed(1.1)">1.1x</button>
-                        <button class="btn" onclick="setSpeed(1.2)">1.2x</button>
-                        <button class="btn" onclick="setSpeed(1.3)">1.3x</button>
-                        <button class="btn" onclick="setSpeed(1.4)">1.4x</button>
-                        <button class="btn" onclick="setSpeed(1.5)">1.5x</button>
-                    </div>
-                </div>
-                
-                <!-- 镜面翻转 -->
-                <div class="control-group">
-                    <h3>🪞 镜面翻转</h3>
-                    <button class="btn btn-primary" onclick="toggleMirror()">
-                        切换镜像
-                    </button>
-                    <p style="font-size: 12px; color: #666; margin-top: 10px;">
-                        用于对镜练习舞蹈动作
-                    </p>
-                </div>
-                
-                <!-- AB 循环 -->
-                <div class="control-group">
-                    <h3>🔄 AB 循环</h3>
-                    <button class="btn btn-secondary" onclick="setPointA()">
-                        设置 A 点
-                    </button>
-                    <button class="btn btn-secondary" onclick="setPointB()">
-                        设置 B 点
-                    </button>
-                    <button class="btn btn-success" onclick="startABLoop()">
-                        开始循环
-                    </button>
-                    <button class="btn" onclick="clearABLoop()">
-                        清除循环
-                    </button>
-                    <div class="ab-loop-info" id="abInfo">
-                        A: 未设置 | B: 未设置
-                    </div>
+            <div class="control-group">
+                <h3>🪞 镜面翻转</h3>
+                <button class="btn" onclick="toggleMirror()">
+                    切换镜像模式
+                </button>
+            </div>
+            
+            <div class="control-group">
+                <h3>🔄 AB 循环</h3>
+                <button class="btn btn-secondary" onclick="setPointA()">
+                    设置 A 点
+                </button>
+                <button class="btn btn-secondary" onclick="setPointB()">
+                    设置 B 点
+                </button>
+                <button class="btn btn-success" onclick="startABLoop()">
+                    开始循环
+                </button>
+                <button class="btn" onclick="clearABLoop()">
+                    清除循环
+                </button>
+                <div class="ab-loop-info" id="abInfo">
+                    A: 未设置 | B: 未设置
                 </div>
             </div>
         </div>
         
-        <h2 style="color: #333; margin-bottom: 20px;">📹 视频列表</h2>
+        <h2>📹 视频列表</h2>
         <div class="video-list" id="videoList">
             <p style="text-align: center; color: #666;">加载中...</p>
         </div>
     </div>
     
+    <!-- 引入 JS 文件 -->
+    <script src="/static/js/utils.js"></script>
+    <script src="/static/js/api.js"></script>
     <script>
-        const API_BASE = 'http://localhost:8080/api/v1';
-        const token = localStorage.getItem('token');
         const videoPlayer = document.getElementById('videoPlayer');
         
         let pointA = null;
@@ -292,72 +94,70 @@
         let currentVideoId = null;
         
         // 初始化
-        if (!token) {
-            showMessage('请先登录！', 'error');
-            setTimeout(() => window.location.href = 'index.html', 2000);
-        } else {
-            loadVideos();
-        }
-        
-        // 显示消息
-        function showMessage(msg, type) {
-            const msgEl = document.getElementById('message');
-            msgEl.textContent = msg;
-            msgEl.className = `message ${type}`;
-            msgEl.style.display = 'block';
-            setTimeout(() => msgEl.style.display = 'none', 5000);
-        }
+        window.onload = function() {
+            if (!DanceMirrorAPI.isLoggedIn()) {
+                Utils.showMessage('message', '请先登录！正在跳转...', 'error');
+                setTimeout(() => window.location.href = '/static/index.html', 2000);
+            } else {
+                loadVideos();
+            }
+        };
         
         // 加载视频列表
         async function loadVideos() {
+            const listEl = document.getElementById('videoList');
+            
             try {
-                const response = await fetch(`${API_BASE}/videos`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
+                const videos = await DanceMirrorAPI.getVideos();
                 
-                const videos = await response.json();
-                const listEl = document.getElementById('videoList');
-                
-                if (response.ok && videos.length > 0) {
+                if (videos && videos.length > 0) {
                     listEl.innerHTML = '';
-                    videos.forEach(video => {
+                    videos.forEach((video, index) => {
                         const item = document.createElement('div');
                         item.className = 'video-item';
                         item.innerHTML = `
-                            <h4>${video.title}</h4>
-                            <p>${video.description || '暂无描述'}</p>
+                            <h4>${Utils.escapeHtml(video.title)}</h4>
+                            <p>${Utils.escapeHtml(video.description || '暂无描述')}</p>
                             <p style="font-size: 11px; color: #999; margin-top: 5px;">
-                                ${new Date(video.createdAt).toLocaleString()}
+                                ${Utils.formatDate(video.createdAt)}
                             </p>
                         `;
-                        item.onclick = () => playVideo(video);
+                        item.onclick = () => playVideo(video, item);
                         listEl.appendChild(item);
+                        
+                        // 自动播放第一个视频
+                        if (index === 0) {
+                            playVideo(video, item);
+                        }
                     });
                 } else {
                     listEl.innerHTML = '<p style="text-align:center;color:#666;">暂无视频</p>';
                 }
             } catch (error) {
-                showMessage('加载失败: ' + error.message, 'error');
+                Utils.showMessage('message', '加载失败: ' + error.message, 'error');
+                listEl.innerHTML = '<p style="text-align:center;color:#666;">加载失败</p>';
             }
         }
         
         // 播放视频
-        function playVideo(video) {
+        function playVideo(video, itemElement) {
             currentVideoId = video.id;
             videoPlayer.src = `/${video.filePath}`;
             document.getElementById('videoTitle').textContent = video.title;
             document.getElementById('videoDescription').textContent = video.description || '暂无描述';
             
             // 高亮当前视频
-            document.querySelectorAll('.video-item').forEach((item, index) => {
+            document.querySelectorAll('.video-item').forEach(item => {
                 item.classList.remove('active');
             });
-            event.target.closest('.video-item').classList.add('active');
+            itemElement.classList.add('active');
             
             // 清除 AB 循环
             clearABLoop();
             
-            videoPlayer.play();
+            videoPlayer.play().catch(err => {
+                console.log('自动播放被阻止:', err);
+            });
         }
         
         // 设置播放速度
@@ -370,46 +170,44 @@
             });
             event.target.classList.add('active');
             
-            showMessage(`播放速度: ${speed}x`, 'success');
+            Utils.showMessage('message', `播放速度: ${speed}x`, 'success', 2000);
         }
         
         // 切换镜像
         function toggleMirror() {
             videoPlayer.classList.toggle('mirrored');
             const isMirrored = videoPlayer.classList.contains('mirrored');
-            showMessage(isMirrored ? '镜像已开启' : '镜像已关闭', 'success');
+            Utils.showMessage('message', isMirrored ? '✅ 镜像已开启' : '❌ 镜像已关闭', 'success', 2000);
         }
         
         // 设置 A 点
         function setPointA() {
             pointA = videoPlayer.currentTime;
             updateABInfo();
-            showMessage(`A 点已设置: ${formatTime(pointA)}`, 'success');
+            Utils.showMessage('message', `A 点已设置: ${Utils.formatTime(pointA)}`, 'success', 2000);
         }
         
         // 设置 B 点
         function setPointB() {
             pointB = videoPlayer.currentTime;
             updateABInfo();
-            showMessage(`B 点已设置: ${formatTime(pointB)}`, 'success');
+            Utils.showMessage('message', `B 点已设置: ${Utils.formatTime(pointB)}`, 'success', 2000);
         }
         
         // 开始 AB 循环
         function startABLoop() {
             if (pointA === null || pointB === null) {
-                showMessage('请先设置 A 点和 B 点', 'error');
+                Utils.showMessage('message', '请先设置 A 点和 B 点', 'error', 3000);
                 return;
             }
             
             if (pointA >= pointB) {
-                showMessage('A 点必须在 B 点之前', 'error');
+                Utils.showMessage('message', 'A 点必须在 B 点之前', 'error', 3000);
                 return;
             }
             
             // 清除之前的循环
-            if (loopInterval) {
-                clearInterval(loopInterval);
-            }
+            videoPlayer.removeEventListener('timeupdate', handleABLoop);
             
             // 跳转到 A 点
             videoPlayer.currentTime = pointA;
@@ -418,7 +216,7 @@
             // 监听时间更新
             videoPlayer.addEventListener('timeupdate', handleABLoop);
             
-            showMessage('AB 循环已开始', 'success');
+            Utils.showMessage('message', '✅ AB 循环已开始', 'success', 2000);
         }
         
         // 处理 AB 循环
@@ -434,23 +232,65 @@
             pointB = null;
             videoPlayer.removeEventListener('timeupdate', handleABLoop);
             updateABInfo();
-            showMessage('AB 循环已清除', 'success');
+            Utils.showMessage('message', 'AB 循环已清除', 'success', 2000);
         }
         
         // 更新 AB 信息显示
         function updateABInfo() {
             const info = document.getElementById('abInfo');
-            const aText = pointA !== null ? formatTime(pointA) : '未设置';
-            const bText = pointB !== null ? formatTime(pointB) : '未设置';
+            const aText = pointA !== null ? Utils.formatTime(pointA) : '未设置';
+            const bText = pointB !== null ? Utils.formatTime(pointB) : '未设置';
             info.textContent = `A: ${aText} | B: ${bText}`;
         }
         
-        // 格式化时间
-        function formatTime(seconds) {
-            const mins = Math.floor(seconds / 60);
-            const secs = Math.floor(seconds % 60);
-            return `${mins}:${secs.toString().padStart(2, '0')}`;
-        }
+        // 键盘快捷键
+        document.addEventListener('keydown', (e) => {
+            // 空格 - 播放/暂停
+            if (e.code === 'Space' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+                e.preventDefault();
+                if (videoPlayer.paused) {
+                    videoPlayer.play();
+                } else {
+                    videoPlayer.pause();
+                }
+            }
+            
+            // 左箭头 - 后退 5 秒
+            if (e.code === 'ArrowLeft') {
+                e.preventDefault();
+                videoPlayer.currentTime = Math.max(0, videoPlayer.currentTime - 5);
+            }
+            
+            // 右箭头 - 前进 5 秒
+            if (e.code === 'ArrowRight') {
+                e.preventDefault();
+                videoPlayer.currentTime = Math.min(videoPlayer.duration, videoPlayer.currentTime + 5);
+            }
+            
+            // M - 切换镜像
+            if (e.code === 'KeyM') {
+                e.preventDefault();
+                toggleMirror();
+            }
+            
+            // A - 设置 A 点
+            if (e.code === 'KeyA') {
+                e.preventDefault();
+                setPointA();
+            }
+            
+            // B - 设置 B 点
+            if (e.code === 'KeyB') {
+                e.preventDefault();
+                setPointB();
+            }
+            
+            // L - 开始循环
+            if (e.code === 'KeyL') {
+                e.preventDefault();
+                startABLoop();
+            }
+        });
     </script>
 </body>
 </html>
