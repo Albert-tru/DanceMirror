@@ -1,3 +1,7 @@
+#!/bin/bash
+
+# 创建新的 video-player.html
+cat > video-player.html << 'HTMLEOF'
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -98,6 +102,10 @@
     </div>
     <script src="/static/js/utils.js"></script>
     <script src="/static/js/api.js"></script>
+HTMLEOF
+
+# 追加JavaScript代码（第1部分）
+cat >> video-player.html << 'JSEOF'
     <script>
         const originalVideo = document.getElementById('originalVideo');
         const userVideo = document.getElementById('userVideo');
@@ -398,3 +406,9 @@
     </script>
 </body>
 </html>
+JSEOF
+
+echo "✅ video-player.html 更新完成！"
+echo "备份文件: video-player.html.bak"
+wc -l video-player.html
+
