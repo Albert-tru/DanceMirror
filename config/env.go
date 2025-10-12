@@ -26,12 +26,24 @@ var Envs = initConfig()
 func initConfig() Config {
 	godotenv.Load()
 
+	dbHost := getEnv("DB_HOST", "localhost")
+	dbPort := getEnv("DB_PORT", "3306")
+
+	var dbAddress string
+	if dbPort == "" {
+		// Socket 连接：直接使用 socket 路径
+		dbAddress = dbHost
+	} else {
+		// TCP 连接：构建 host:port 格式
+		dbAddress = fmt.Sprintf("%s:%s", dbHost, dbPort)
+	}
+
 	return Config{
 		PublicHost:    getEnv("PUBLIC_HOST", "http://localhost:8080"),
 		Port:          getEnv("APP_PORT", "8080"),
 		DBUser:        getEnv("DB_USER", "root"),
 		DBPassword:    getEnv("DB_PASSWORD", ""),
-		DBAddress:     fmt.Sprintf("%s:%s", getEnv("DB_HOST", "localhost"), getEnv("DB_PORT", "3306")),
+		DBAddress:     dbAddress,
 		DBName:        getEnv("DB_NAME", "dancemirror"),
 		JWTSecret:     getEnv("JWT_SECRET", "super-secret-jwt-key"),
 		JWTExpiration: getEnv("JWT_EXPIRATION", "72h"),

@@ -173,13 +173,33 @@ const DanceMirrorAPI = (function() {
         },
 
         async uploadVideo(title, description, file, onProgress) {
-            console.log('开始上传视频:', title, file.name);
-            const formData = new FormData();
-            formData.append('video', file);
-            formData.append('title', title);
-            formData.append('description', description);
+            // 支持两种调用方式：
+            // 1. uploadVideo(title, description, file, onProgress) - 传统方式
+            // 2. uploadVideo(file, {title, description, onProgress}) - 新方式（用于录制上传）
+            let videoFile, videoTitle, videoDescription, progressCallback;
             
-            return uploadWithProgress('/videos', formData, onProgress);
+            if (title instanceof File || title instanceof Blob) {
+                // 新方式：第一个参数是 File/Blob，第二个参数是配置对象
+                videoFile = title;
+                const options = description || {};
+                videoTitle = options.title || 'Untitled';
+                videoDescription = options.description || '';
+                progressCallback = options.onProgress;
+            } else {
+                // 传统方式
+                videoFile = file;
+                videoTitle = title;
+                videoDescription = description || '';
+                progressCallback = onProgress;
+            }
+            
+            console.log('开始上传视频:', videoTitle, videoFile.name || 'blob');
+            const formData = new FormData();
+            formData.append('file', videoFile);  // 使用 'file' 字段（后端支持）
+            formData.append('title', videoTitle);
+            formData.append('description', videoDescription);
+            
+            return uploadWithProgress('/videos', formData, progressCallback);
         },
 
         async deleteVideo(videoId) {
