@@ -151,8 +151,8 @@
             <div style="margin-top:8px; font-size:13px; color:#666;">提示：当前实现导出裁剪后的静态帧（PNG）。如需导出裁剪后的视频，可集成 ffmpeg.wasm。</div>
         </div>
         <div class="crop-actions">
-            <button id="applyCropBtn" type="button" class="btn btn-success">✅ 应用裁剪并下载</button>
-            <button id="cancelCropBtn" type="button" class="btn">取消</button>
+            <button id="applyCropBtn" class="btn btn-success">✅ 应用裁剪并下载</button>
+            <button id="cancelCropBtn" class="btn">取消</button>
         </div>
     </div>
 
@@ -482,11 +482,6 @@
         }
 
         function openCropPanel(){
-            // require a video source (recorded or loaded) before opening the crop panel
-            if (!(typeof recordedBlob !== 'undefined' && recordedBlob) && !(window.userVideo && userVideo.src)) {
-                if (typeof showMessage === 'function') showMessage('请先录制或加载本地视频，再打开裁剪面板', 'error');
-                return;
-            }
             cropPanel.classList.remove('hidden'); cropPanel.setAttribute('aria-hidden','false');
             // ensure video shown in userVideo is playing for frame capture
             userVideo.pause(); userVideo.currentTime = Math.min(userVideo.duration || 0, 0);
@@ -498,6 +493,16 @@
             }, 200);
         }
 
+        document.getElementById('applyCropBtn').addEventListener('click', async ()=>{
+            if (!activeCropper) return;
+            const blob = await activeCropper.exportCroppedImageBlob();
+            if (!blob) { showMessage('裁剪失败','error'); return; }
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = 'crop_' + Date.now() + '.png'; document.body.appendChild(a); a.click(); a.remove();
+            URL.revokeObjectURL(url);
+            showMessage('裁剪已保存（PNG）。如需导出视频请请求集成 ffmpeg.wasm。', 'success', 3000);
+            closeCropPanel();
+        });
 
         document.getElementById('cancelCropBtn').addEventListener('click', ()=> closeCropPanel());
         document.getElementById('cropClose').addEventListener('click', ()=> closeCropPanel());
@@ -606,110 +611,5 @@
         // export helpers to global for easy use in page scripts
         window.FFmpegWASM = { ensureFFmpeg, cropAndTranscode };
     </script>
-</body>
-<!-- FFmpeg.wasm crop+transcode helper (appended) -->
-<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
-<script>
-const FFmpegWASM = (function(){
-  let ffmpeg = null, loaded = false;
-  // keep a small rolling log of ffmpeg stdout/stderr
-  let _logs = [];
-  function pushLog(line){
-    _logs.push(String(line));
-    if(_logs.length>200) _logs.shift();
-  }
-  return {
-    ensure: async function({log=false}={}){
-      if (loaded && ffmpeg) return ffmpeg;
-      if (!window.FFmpeg) throw new Error('FFmpeg not found');
-      const { createFFmpeg, fetchFile } = FFmpeg;
-      ffmpeg = createFFmpeg({ log });
-      // attach a logger if supported
-      try{
-        ffmpeg.setLogger && ffmpeg.setLogger(({type, message})=>{ pushLog(type+': '+message); });
-      }catch(e){}
-      await ffmpeg.load();
-      ffmpeg._fetchFile = fetchFile;
-      loaded = true; return ffmpeg;
-    },
-    get: () => ffmpeg,
-    getRecentLogs: () => _logs.join('\n')
-  };
-})();
-
-async function cropAndTranscode(inputBlob, cropParams, opts={}){
-  const format = opts.format||'mp4';
-  const onProgress = typeof opts.onProgress==='function'?opts.onProgress:()=>{};
-  const ffmpeg = await FFmpegWASM.ensure({ log:false });
-  const fetchFile = ffmpeg._fetchFile;
-  const extIn = (inputBlob.type && inputBlob.type.includes('webm'))? 'webm':'mp4';
-  const inName = 'in.'+extIn; const outName = 'out.'+(format==='webm'?'webm':'mp4');
-  const data = await fetchFile(inputBlob);
-  try{ ffmpeg.FS('unlink', inName); }catch(e){}
-  try{ ffmpeg.FS('unlink', outName); }catch(e){}
-  ffmpeg.FS('writeFile', inName, data);
-  const cropFilter = `crop=${Math.round(cropParams.w)}:${Math.round(cropParams.h)}:${Math.round(cropParams.x)}:${Math.round(cropParams.y)}`;
-  const args = ['-hide_banner','-y','-i',inName,'-vf',cropFilter];
-  if(format==='mp4') args.push('-c:v','libx264','-preset','veryfast','-crf','28','-c:a','aac','-b:a','128k','-movflags','+faststart',outName);
-  else args.push('-c:v','libvpx','-b:v','1M','-c:a','libvorbis', outName);
-  ffmpeg.setProgress(({ratio})=>{ try{ onProgress(ratio); }catch(e){} });
-  try{
-    await ffmpeg.run(...args);
-  } catch(runErr){
-    // rethrow with ffmpeg logs if available
-    try{
-      const log = ffmpeg && ffmpeg._ffmpeg && ffmpeg._ffmpeg.FS ? '' : '';
-    } catch(e){}
-    var recent = (FFmpegWASM && FFmpegWASM.getRecentLogs) ? FFmpegWASM.getRecentLogs() : '';
-var tail = recent.split('\n').slice(-20).join('\n');
-var msg = 'ffmpeg.run failed: ' + (runErr && runErr.message ? runErr.message : String(runErr));
-if(tail) msg += '\n--- ffmpeg recent logs ---\n' + tail;
-throw new Error(msg);
-  }
-  const outData = ffmpeg.FS('readFile', outName);
-  const blob = new Blob([outData.buffer], { type: format==='mp4'?'video/mp4':'video/webm' });
-  try{ ffmpeg.FS('unlink', inName); }catch(e){}
-  try{ ffmpeg.FS('unlink', outName); }catch(e){}
-  return blob;
-}
-
-// Robust applyCrop handler: auto-init cropper, wait for readiness, fallback to full-canvas
-(function wireApplyCrop(){
-  const applyBtn = document.getElementById('applyCropBtn');
-  if(!applyBtn) return;
-  applyBtn.type='button';
-  applyBtn.addEventListener('click', async ()=>{
-    try{
-      // ensure cropper
-      if(!window.activeCropper){
-        if(window.cropCanvas){
-          try{ userVideo.pause(); userVideo.currentTime = Math.min(userVideo.duration||0,0); userVideo.play().catch(()=>{}); }catch(e){}
-          activeCropper = new VideoCropper(userVideo, cropCanvas); activeCropper.init(); await new Promise(r=>setTimeout(r,150));
-        }else if(window.userVideo && userVideo.readyState>=2){
-          const off=document.createElement('canvas'); const w=userVideo.videoWidth||640,h=userVideo.videoHeight||360; off.width=w; off.height=h; const ctx=off.getContext('2d'); try{ctx.drawImage(userVideo,0,0,w,h);}catch(e){}
-          activeCropper={canvas:off, crop:{x:0,y:0,w:w,h:h}};
-        }
-      }
-      let waited=0; while((!activeCropper||!activeCropper.crop) && waited<1500){ await new Promise(r=>setTimeout(r,100)); waited+=100; }
-      if(!activeCropper||!activeCropper.crop){ if(activeCropper&&activeCropper.canvas){ activeCropper.crop={x:0,y:0,w:activeCropper.canvas.width,h:activeCropper.canvas.height}; } else { if(typeof showMessage==='function') showMessage('未选择裁剪区域，且无法自动初始化裁剪器，请先打开裁剪面板并等待视频加载','error'); return; } }
-
-      if(typeof showMessage==='function') showMessage('准备 ffmpeg（首次加载可能较慢）...', 'info', 0);
-      await FFmpegWASM.ensure({ log:false });
-
-      let inputBlob=null;
-      if(typeof recordedBlob!=='undefined' && recordedBlob) inputBlob = recordedBlob instanceof Blob?recordedBlob:new Blob([recordedBlob]);
-      else if(window.userVideo && userVideo.src){ const resp = await fetch(userVideo.src); if(!resp.ok) throw new Error('无法获取视频源: '+resp.status); inputBlob = await resp.blob(); }
-      if(!inputBlob){ if(typeof showMessage==='function') showMessage('未找到输入视频','error'); return; }
-      if(typeof showMessage==='function') showMessage('开始转码（浏览器端）...', 'info', 0);
-
-      const c = activeCropper.crop; const cropParams = { x: Math.max(0,Math.round(c.x)), y: Math.max(0,Math.round(c.y)), w: Math.max(1,Math.round(c.w)), h: Math.max(1,Math.round(c.h)) };
-      const outBlob = await cropAndTranscode(inputBlob, cropParams, { format:'mp4', onProgress: (r)=>{ if(typeof showMessage==='function') showMessage('转码进度: '+Math.round(r*100)+'%','info',0); } });
-      if(!outBlob) throw new Error('转码未生成输出');
-      recordedBlob = outBlob; const dl=document.getElementById('downloadRecBtn'); if(dl)dl.disabled=false; const up=document.getElementById('uploadRecBtn'); if(up)up.disabled=false;
-      const url = URL.createObjectURL(outBlob); const a=document.createElement('a'); a.href=url; a.download='crop_'+Date.now()+'.mp4'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-      if(typeof showMessage==='function') showMessage('转码完成，已设置为可上传的录制文件','success',4000); if(typeof closeCropPanel==='function') closeCropPanel();
-    }catch(err){ console.error('Crop transcode failed', err); if(typeof showMessage==='function') showMessage('转码失败: '+(err&&err.message?err.message:err),'error',8000);}  });
-})();
-</script>
 </body>
 </html>

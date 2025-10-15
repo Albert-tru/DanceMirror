@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  # DanceMirror 应用服务
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dancemirror-app
+    ports:
+      - "8080:8080"
+    environment:
+      # 从 .env 文件读取或在此覆盖
+      - PORT=8080
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=MySQL666
+      - DB_NAME=dancemirror
+      - JWT_SECRET=your-secret-key-change-in-production
+      - JWT_EXPIRATION=3600
+      - UPLOAD_DIR=/app/uploads
+    volumes:
+      # 挂载 uploads 目录到宿主机（持久化上传文件）
+      - ./uploads:/app/uploads
+      # 挂载静态文件（开发时可热更新前端）
+      - ./static:/app/static
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - dancemirror-network
+
+  # MySQL 数据库服务
+  db:
+    image: mysql:8.0
+    container_name: dancemirror-db
+    environment:
+      MYSQL_ROOT_PASSWORD: MySQL666
+      MYSQL_DATABASE: dancemirror
+      MYSQL_CHARACTER_SET_SERVER: utf8mb4
+      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
+    ports:
+      - "3306:3306"
+    volumes:
+      # 持久化数据库数据
+      - db-data:/var/lib/mysql
+      # 如果有初始化 SQL，可以挂载
+      # - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pMySQL666"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - dancemirror-network
+
+networks:
+  dancemirror-network:
+    driver: bridge
+
+volumes:
+  db-data:
+    driver: local
