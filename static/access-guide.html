@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>访问指南 - DanceMirror</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 32px;
+            text-align: center;
+        }
+        .alert {
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 5px solid;
+        }
+        .alert-success {
+            background: #e8f5e9;
+            border-color: #4caf50;
+            color: #2e7d32;
+        }
+        .alert-warning {
+            background: #fff3e0;
+            border-color: #ff9800;
+            color: #e65100;
+        }
+        .alert-info {
+            background: #e3f2fd;
+            border-color: #2196f3;
+            color: #1565c0;
+        }
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 30px 0;
+        }
+        @media (max-width: 768px) {
+            .comparison { grid-template-columns: 1fr; }
+        }
+        .card {
+            padding: 25px;
+            border-radius: 10px;
+            border: 2px solid;
+        }
+        .card-success {
+            border-color: #4caf50;
+            background: #f1f8f4;
+        }
+        .card-danger {
+            border-color: #f44336;
+            background: #fef5f5;
+        }
+        .card h3 {
+            margin-bottom: 15px;
+            font-size: 20px;
+        }
+        .card-success h3 { color: #2e7d32; }
+        .card-danger h3 { color: #c62828; }
+        .feature {
+            padding: 10px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .icon {
+            font-size: 20px;
+            min-width: 25px;
+        }
+        .url-box {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 14px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            word-break: break-all;
+        }
+        .btn-group {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+            transition: all 0.3s;
+            flex: 1;
+            min-width: 200px;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+        .btn-primary {
+            background: #4caf50;
+            color: white;
+        }
+        .btn-secondary {
+            background: #2196f3;
+            color: white;
+        }
+        .section {
+            margin: 30px 0;
+            padding: 20px 0;
+            border-top: 2px solid #eee;
+        }
+        .section h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 24px;
+        }
+        ul {
+            margin-left: 20px;
+            line-height: 1.8;
+        }
+        code {
+            background: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+            color: #d32f2f;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 DanceMirror 访问指南</h1>
+        
+        <div class="alert alert-info">
+            <strong>📢 重要提示：</strong> 浏览器出于安全考虑，只允许在安全上下文（HTTPS 或 localhost/127.0.0.1）中访问摄像头和麦克风。
+        </div>
+
+        <div class="comparison">
+            <div class="card card-success">
+                <h3>✅ 推荐访问方式</h3>
+                <div class="feature">
+                    <span class="icon">🌐</span>
+                    <span>使用 <strong>127.0.0.1</strong></span>
+                </div>
+                <div class="url-box">http://127.0.0.1:8080</div>
+                <div class="feature">
+                    <span class="icon">✅</span>
+                    <span>支持摄像头访问</span>
+                </div>
+                <div class="feature">
+                    <span class="icon">✅</span>
+                    <span>支持麦克风访问</span>
+                </div>
+                <div class="feature">
+                    <span class="icon">✅</span>
+                    <span>可以录制视频</span>
+                </div>
+                <div class="feature">
+                    <span class="icon">✅</span>
+                    <span>完整功能可用</span>
+                </div>
+            </div>
+
+            <div class="card card-danger">
+                <h3>⚠️ 受限访问方式</h3>
+                <div class="feature">
+                    <span class="icon">🌐</span>
+                    <span>使用 <strong>192.168.20.116</strong></span>
+                </div>
+                <div class="url-box">http://192.168.20.116:8080</div>
+                <div class="feature">
+                    <span class="icon">❌</span>
+                    <span>不支持摄像头</span>
+                </div>
+                <div class="feature">
+                    <span class="icon">❌</span>
+                    <span>不支持麦克风</span>
+                </div>
+                <div class="feature">
+                    <span class="icon">❌</span>
+                    <span>无法录制视频</span>
+                </div>
+                <div class="feature">
+                    <span class="icon">✅</span>
+                    <span>可以浏览和播放</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="alert alert-success">
+            <strong>🎉 开始使用：</strong> 请点击下方按钮，使用 127.0.0.1 访问以获得完整功能！
+        </div>
+
+        <div class="btn-group">
+            <a href="http://127.0.0.1:8080/static/camera-test.html" class="btn btn-secondary">
+                📹 测试摄像头
+            </a>
+            <a href="http://127.0.0.1:8080/static/video-player.html" class="btn btn-primary">
+                🎬 视频播放器
+            </a>
+        </div>
+
+        <div class="section">
+            <h2>📱 常用链接（127.0.0.1）</h2>
+            <ul>
+                <li><a href="http://127.0.0.1:8080/static/index.html" target="_blank">主页</a></li>
+                <li><a href="http://127.0.0.1:8080/static/video-player.html" target="_blank">视频播放器</a></li>
+                <li><a href="http://127.0.0.1:8080/static/camera-test.html" target="_blank">摄像头测试</a></li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>❓ 常见问题</h2>
+            
+            <h3 style="margin-top: 20px; color: #555;">Q: 为什么 192.168.20.116 不能用摄像头？</h3>
+            <p style="margin: 10px 0; line-height: 1.6;">
+                A: 这是浏览器的安全策略。现代浏览器只允许在以下环境访问摄像头：
+            </p>
+            <ul>
+                <li><code>https://</code> 网站（加密连接）</li>
+                <li><code>localhost</code> 或 <code>127.0.0.1</code>（本地地址）</li>
+            </ul>
+
+            <h3 style="margin-top: 20px; color: #555;">Q: 如何在其他设备上使用摄像头？</h3>
+            <p style="margin: 10px 0; line-height: 1.6;">
+                A: 需要配置 HTTPS。可以使用以下方法：
+            </p>
+            <ul>
+                <li>使用反向代理（Nginx/Caddy）配置 SSL 证书</li>
+                <li>使用 Let's Encrypt 获取免费证书</li>
+                <li>使用自签名证书（开发环境）</li>
+            </ul>
+
+            <h3 style="margin-top: 20px; color: #555;">Q: localhost 打不开怎么办？</h3>
+            <p style="margin: 10px 0; line-height: 1.6;">
+                A: 请使用 <code>127.0.0.1</code> 代替。如果还是不行，检查：
+            </p>
+            <ul>
+                <li>浏览器是否配置了代理</li>
+                <li>防火墙是否阻止了访问</li>
+                <li>服务是否正在运行：<code>ps aux | grep dancemirror</code></li>
+            </ul>
+
+            <h3 style="margin-top: 20px; color: #555;">Q: 摄像头权限被拒绝怎么办？</h3>
+            <p style="margin: 10px 0; line-height: 1.6;">
+                A: 点击浏览器地址栏旁的图标，重新允许摄像头和麦克风权限。
+            </p>
+        </div>
+
+        <div class="section">
+            <h2>🔧 技术说明</h2>
+            <p style="line-height: 1.6; color: #666;">
+                当前系统已自动配置 API 地址适配：
+            </p>
+            <ul>
+                <li>从 <code>127.0.0.1</code> 访问时，API 调用使用 <code>127.0.0.1</code></li>
+                <li>从 <code>192.168.20.116</code> 访问时，API 调用使用 <code>192.168.20.116</code></li>
+                <li>可以在浏览器控制台看到当前使用的 API 地址</li>
+            </ul>
+        </div>
+
+        <div class="alert alert-warning">
+            <strong>💡 温馨提示：</strong> 建议将 <code>http://127.0.0.1:8080/static/video-player.html</code> 添加到浏览器书签，方便下次访问。
+        </div>
+    </div>
+
+    <script>
+        // 自动检测当前访问地址
+        window.addEventListener('load', function() {
+            const hostname = window.location.hostname;
+            console.log('当前访问地址:', window.location.href);
+            console.log('主机名:', hostname);
+            
+            if (hostname !== '127.0.0.1' && hostname !== 'localhost') {
+                // 如果不是从推荐地址访问，显示提示
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-warning';
+                alertDiv.innerHTML = '<strong>⚠️ 注意：</strong> 您当前使用 <code>' + hostname + '</code> 访问此页面。如需使用摄像头功能，请改用 <a href="http://127.0.0.1:8080/static/access-guide.html" style="color: #d84315; text-decoration: underline;">http://127.0.0.1:8080</a>';
+                document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.container').firstChild.nextSibling);
+            }
+        });
+    </script>
+</body>
+</html>

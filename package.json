@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@ffmpeg/core": "^0.12.10"
+  }
+}

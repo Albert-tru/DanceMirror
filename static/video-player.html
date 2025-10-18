@@ -1,3 +1,4 @@
+<!-- v2.1 - Fixed camera access check -->
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -227,6 +228,10 @@
 
         async function startRecording(){
             try {
+                // 检查浏览器支持
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error("您的浏览器不支持摄像头访问。请使用最新版 Chrome、Firefox 或 Edge 浏览器");
+                }
                 const stream = await navigator.mediaDevices.getUserMedia({ video:true, audio:true });
                 recordedChunks = [];
                 const options = { mimeType: 'video/webm;codecs=vp8,opus' };

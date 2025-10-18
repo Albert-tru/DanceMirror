@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>摄像头测试 - DanceMirror</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 800px;
+            width: 100%;
+        }
+        h1 { color: #333; margin-bottom: 10px; font-size: 28px; }
+        .status {
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-size: 14px;
+            line-height: 1.6;
+            white-space: pre-line;
+        }
+        .status.info { background: #e3f2fd; color: #1976d2; border-left: 4px solid #1976d2; }
+        .status.success { background: #e8f5e9; color: #388e3c; border-left: 4px solid #388e3c; }
+        .status.error { background: #ffebee; color: #c62828; border-left: 4px solid #c62828; }
+        .status.warning { background: #fff3e0; color: #f57c00; border-left: 4px solid #f57c00; }
+        .video-container {
+            position: relative;
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 20px 0;
+            display: none;
+        }
+        .video-container.active { display: block; }
+        video { width: 100%; height: auto; display: block; }
+        .controls { display: flex; gap: 10px; margin: 20px 0; flex-wrap: wrap; }
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            flex: 1;
+            min-width: 150px;
+        }
+        button:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-primary { background: #667eea; color: white; }
+        .btn-danger { background: #f44336; color: white; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .info-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .info-section h3 { color: #333; margin-bottom: 10px; font-size: 18px; }
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .info-item:last-child { border-bottom: none; }
+        .info-label { font-weight: 600; color: #495057; }
+        .info-value { color: #6c757d; font-family: monospace; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📹 摄像头访问测试</h1>
+        <div id="statusBox" class="status info">准备测试浏览器摄像头和麦克风访问...</div>
+
+        <div class="info-section">
+            <h3>当前环境信息</h3>
+            <div class="info-item">
+                <span class="info-label">访问地址:</span>
+                <span class="info-value" id="currentUrl">-</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">协议:</span>
+                <span class="info-value" id="protocol">-</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">主机名:</span>
+                <span class="info-value" id="hostname">-</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">是否安全上下文:</span>
+                <span class="info-value" id="isSecure">-</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">MediaDevices 支持:</span>
+                <span class="info-value" id="mediaSupport">-</span>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="btn-primary" onclick="startCamera()">🎥 测试摄像头</button>
+            <button class="btn-danger" onclick="stopCamera()" disabled id="stopBtn">⏹ 停止</button>
+        </div>
+
+        <div class="video-container" id="videoContainer">
+            <video id="videoElement" autoplay playsinline muted></video>
+        </div>
+    </div>
+
+    <script>
+        let stream = null;
+        const videoElement = document.getElementById('videoElement');
+        const statusBox = document.getElementById('statusBox');
+        const videoContainer = document.getElementById('videoContainer');
+        const stopBtn = document.getElementById('stopBtn');
+
+        function displayEnvironmentInfo() {
+            document.getElementById('currentUrl').textContent = window.location.href;
+            document.getElementById('protocol').textContent = window.location.protocol;
+            document.getElementById('hostname').textContent = window.location.hostname;
+            
+            const isSecure = window.isSecureContext;
+            const isSecureEl = document.getElementById('isSecure');
+            isSecureEl.textContent = isSecure ? '✅ 是' : '❌ 否';
+            isSecureEl.style.color = isSecure ? '#388e3c' : '#c62828';
+            
+            const hasMediaDevices = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+            const mediaSupportEl = document.getElementById('mediaSupport');
+            mediaSupportEl.textContent = hasMediaDevices ? '✅ 支持' : '❌ 不支持';
+            mediaSupportEl.style.color = hasMediaDevices ? '#388e3c' : '#c62828';
+        }
+
+        function showStatus(message, type = 'info') {
+            statusBox.textContent = message;
+            statusBox.className = 'status ' + type;
+        }
+
+        async function startCamera() {
+            try {
+                showStatus('正在检查浏览器支持...', 'info');
+
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error('您的浏览器不支持 getUserMedia API。请使用最新版 Chrome、Firefox 或 Edge 浏览器。');
+                }
+
+                if (!window.isSecureContext) {
+                    const hostname = window.location.hostname;
+                    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+                        throw new Error('当前使用 ' + window.location.protocol + '，摄像头访问需要 HTTPS 或 localhost 环境。\n\n请改用: http://localhost:' + (window.location.port || '8080') + '/static/camera-test.html');
+                    }
+                }
+
+                showStatus('正在请求摄像头和麦克风权限，请在浏览器弹窗中允许访问...', 'info');
+
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+                    audio: true
+                });
+
+                videoElement.srcObject = stream;
+                videoContainer.classList.add('active');
+                stopBtn.disabled = false;
+
+                const videoTrack = stream.getVideoTracks()[0];
+                const audioTrack = stream.getAudioTracks()[0];
+                const settings = videoTrack.getSettings();
+
+                showStatus(
+                    '✅ 摄像头访问成功！\n' +
+                    '视频: ' + settings.width + 'x' + settings.height + ' @ ' + settings.frameRate + 'fps\n' +
+                    '摄像头: ' + videoTrack.label + '\n' +
+                    '麦克风: ' + audioTrack.label,
+                    'success'
+                );
+
+            } catch (error) {
+                console.error('摄像头访问失败:', error);
+                
+                let errorMessage = '❌ 无法访问摄像头/麦克风\n\n';
+                
+                if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+                    errorMessage += '原因: 用户拒绝了权限请求\n';
+                    errorMessage += '解决: 请点击地址栏旁的摄像头图标，选择"允许"';
+                } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+                    errorMessage += '原因: 未检测到摄像头或麦克风设备\n';
+                    errorMessage += '解决: 请检查设备是否已连接';
+                } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+                    errorMessage += '原因: 摄像头正被其他应用占用\n';
+                    errorMessage += '解决: 请关闭其他使用摄像头的程序（如 Zoom、Teams）';
+                } else if (error.name === 'SecurityError') {
+                    errorMessage += '原因: 安全限制\n';
+                    errorMessage += '解决: 必须使用 HTTPS 或在 localhost 下运行\n';
+                    errorMessage += '当前地址: ' + window.location.href + '\n';
+                    errorMessage += '建议改用: http://localhost:' + (window.location.port || '8080') + '/static/camera-test.html';
+                } else {
+                    errorMessage += '错误详情: ' + error.message;
+                }
+                
+                showStatus(errorMessage, 'error');
+            }
+        }
+
+        function stopCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            videoElement.srcObject = null;
+            videoContainer.classList.remove('active');
+            stopBtn.disabled = true;
+            showStatus('摄像头已停止', 'info');
+        }
+
+        window.addEventListener('load', function() {
+            displayEnvironmentInfo();
+            
+            if (!window.isSecureContext) {
+                const hostname = window.location.hostname;
+                if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+                    showStatus(
+                        '⚠️ 警告: 当前不是安全上下文 (' + window.location.protocol + ')\n\n' +
+                        '摄像头访问需要 HTTPS 或 localhost 环境。\n' +
+                        '请改用: http://localhost:' + (window.location.port || '8080') + '/static/camera-test.html',
+                        'warning'
+                    );
+                }
+            }
+        });
+
+        window.addEventListener('beforeunload', function() {
+            stopCamera();
+        });
+    </script>
+</body>
+</html>
