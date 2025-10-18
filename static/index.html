@@ -257,7 +257,7 @@
             const userInfo = document.getElementById('userInfo');
             const authSection = document.getElementById('authSection');
             const mainTabs = document.getElementById('mainTabs');
-            const currentUser = DanceMirrorAPI.getCurrentUser();
+            const currentUser = DanceMirrorAPI.getCurrentUser() || { phone: "用户" };
             
             if (DanceMirrorAPI.isLoggedIn() && currentUser) {
                 userInfo.classList.add('show');
@@ -426,7 +426,24 @@
             const description = document.getElementById('videoDescription').value;
             const file = document.getElementById('videoFile').files[0];
             
+            if (!title.trim()) {
+                Utils.showMessage('uploadMessage', '请输入视频标题', 'error');
+                return;
+            }
+
             if (!file) {
+            // 验证文件类型
+            const validTypes = ['video/mp4', 'video/mpeg', 'video/quicktime', 'video/x-msvideo', 'video/x-ms-wmv', 'video/webm', 'video/x-matroska'];
+            if (!validTypes.includes(file.type) && !file.name.match(/.(mp4|mov|avi|wmv|webm|mkv)$/i)) {
+                Utils.showMessage('uploadMessage', '请选择有效的视频文件 (MP4, MOV, AVI, WMV, WebM, MKV)', 'error');
+            // 验证文件大小 (500MB)
+            const maxSize = 524288000;
+            if (file.size > maxSize) {
+                Utils.showMessage('uploadMessage', '文件太大，请选择小于 500MB 的视频', 'error');
+                return;
+            }
+                return;
+            }
                 Utils.showMessage('uploadMessage', '请选择视频文件', 'error');
                 return;
             }
@@ -441,7 +458,7 @@
             progressDiv.style.display = 'block';
             
             try {
-                await DanceMirrorAPI.uploadVideo(title, description, file, (percent) => {
+                await DanceMirrorAPI.uploadVideo({title: title, description: description, file: file}, (percent) => {
                     const rounded = Math.round(percent);
                     progressBar.style.width = rounded + '%';
                     progressText.textContent = rounded + '%';

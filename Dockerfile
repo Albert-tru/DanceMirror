@@ -1,24 +1,31 @@
 # 多阶段构建：先编译 Go 二进制，再打包到最小运行镜像
 # Stage 1: 构建阶段
-FROM golang:1.20-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 # 安装构建依赖
 RUN apk add --no-cache git make
 
 WORKDIR /app
 
-# 复制 go.mod 和 go.sum 并下载依赖（利用 Docker 缓存层）
+# 在 Dockerfile 的 builder 阶段加
+ARG GOPROXY=https://goproxy.cn,direct
+ENV GOPROXY=${GOPROXY}
+ENV GOSUMDB=sum.golang.org
+
+# 复制 go.mod/go.sum（如果你在本地执行过 `go mod vendor`，下面会使用 vendor 目录来避免网络访问）
 COPY go.mod go.sum ./
-RUN go mod download
+
+# 如果项目中有 vendor 目录（请在宿主机执行 `go mod vendor`），复制 vendor 以支持离线构建
+COPY vendor ./vendor
 
 # 复制源代码
 COPY . .
 
-# 构建二进制文件（静态链接以便在 alpine 中运行）
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /app/bin/dancemirror ./cmd/main.go
+# 构建二进制文件（使用 -mod=vendor 来避免在构建中访问网络）
+RUN CGO_ENABLED=0 GOOS=linux go build -mod=vendor -a -installsuffix cgo -o /app/bin/dancemirror ./cmd/main.go
 
-# Stage 2: 运行阶段（包含 ffmpeg，为服务端转码做准备）
-FROM alpine:latest
+# Stage 2: 运行阶段（使用已存在的 golang:1.24-alpine 作为运行镜像以避免拉取 alpine:latest）
+FROM golang:1.24-alpine
 
 # 安装运行时依赖：ca-certificates（HTTPS）、ffmpeg（视频处理）、tzdata（时区）
 RUN apk --no-cache add ca-certificates ffmpeg tzdata && \

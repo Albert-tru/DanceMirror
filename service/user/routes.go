@@ -102,5 +102,13 @@ func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	utils.WriteJSON(w, http.StatusOK, map[string]string{"token": token})
+	utils.WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"token": token,
+		"user": map[string]interface{}{
+			"id":        u.ID,
+			"phone":     u.Phone,
+			"firstName": u.FirstName,
+			"lastName":  u.LastName,
+		},
+	})
 }
