@@ -57,6 +57,20 @@ const DanceMirrorAPI = (function() {
         return fetch(url, fetchOptions).then(async res => {
             if (!res.ok) {
                 let errText = await res.text();
+                
+                // 处理 403 Forbidden 错误（权限被拒绝）
+                if (res.status === 403) {
+                    // 可能是 token 过期或用户不存在，清除本地数据
+                    clearToken();
+                    // 如果错误信息包含 "permission denied"，说明需要重新登录
+                    if (errText.includes('permission denied')) {
+                        // 显示友好提示并重新加载页面（会跳转到登录界面）
+                        alert('登录已过期，请重新登录');
+                        window.location.reload();
+                        return; // 防止继续执行
+                    }
+                }
+                
                 throw new Error(errText || res.statusText);
             }
             try {

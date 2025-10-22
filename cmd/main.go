@@ -7,6 +7,7 @@ import (
 	"github.com/Albert-tru/DanceMirror/cmd/api"
 	"github.com/Albert-tru/DanceMirror/config"
 	"github.com/Albert-tru/DanceMirror/db"
+	"github.com/Albert-tru/DanceMirror/types"
 )
 
 func main() {
@@ -16,10 +17,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// 2. 检查数据库连接
-	initStorage(database)
+	// 2. 自动迁移数据库表
+	if err := database.AutoMigrate(&types.User{}, &types.Video{}); err != nil {
+		log.Fatal("Failed to migrate database:", err)
+	}
 
-	// 3. 启动 Web 服务器
+	// 3. 启动 Web 服务器[api.go]
 	server := api.NewAPIServer(":"+config.Envs.Port, database)
 	if err := server.Run(); err != nil {
 		log.Fatal(err)

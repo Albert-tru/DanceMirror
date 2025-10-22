@@ -1,16 +1,26 @@
 package types
 
-import "time"
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
 
 // User 用户结构
 type User struct {
-	ID        int       `json:"id"`
-	Email     string    `json:"email,omitempty"`
-	Phone     string    `json:"phone"`
-	Password  string    `json:"-"` // 不返回给前端
-	FirstName string    `json:"firstName"`
-	LastName  string    `json:"lastName"`
-	CreatedAt time.Time `json:"createdAt"`
+	ID        int            `json:"id"`
+	Email     string         `json:"email,omitempty" gorm:"size:255"`
+	Phone     string         `json:"phone"`
+	Password  string         `json:"-"` // 不返回给前端
+	FirstName string         `json:"firstName"`
+	LastName  string         `json:"lastName"`
+	CreatedAt time.Time      `json:"createdAt"`
+	UpdatedAt time.Time      `json:"updatedAt"`
+	DeletedAt gorm.DeletedAt `json:"-" gorm:"index"` //软删除：
+	//GORM 会自动把 DeletedAt 设置为当前时间，而不是物理删除这条记录。
+
+	// 关联视频列表
+	Videos []Video `gorm:"foreignKey:UserID" json:"videos,omitempty"` // 用户上传的视频列表
 }
 
 // RegisterUserPayload 用户注册请求
@@ -29,17 +39,21 @@ type LoginUserPayload struct {
 
 // Video 视频结构
 type Video struct {
-	ID          int       `json:"id"`
-	UserID      int       `json:"userId"`
-	Title       string    `json:"title"`
-	Description string    `json:"description"`
-	FilePath    string    `json:"filePath"`
-	FileName    string    `json:"fileName"`
-	FileSize    int64     `json:"fileSize"`
-	Duration    float64   `json:"duration,omitempty"`  // 视频时长（秒）
-	Thumbnail   string    `json:"thumbnail,omitempty"` // 缩略图路径
-	CreatedAt   time.Time `json:"createdAt"`
-	UpdatedAt   time.Time `json:"updatedAt"`
+	ID          int            `json:"id"`
+	UserID      int            `json:"userId"`
+	Title       string         `json:"title"`
+	Description string         `json:"description"`
+	FilePath    string         `json:"filePath"`
+	FileName    string         `json:"fileName"`
+	FileSize    int64          `json:"fileSize"`
+	Duration    float64        `json:"duration,omitempty"`  // 视频时长（秒）
+	Thumbnail   string         `json:"thumbnail,omitempty"` // 缩略图路径
+	CreatedAt   time.Time      `json:"createdAt"`
+	UpdatedAt   time.Time      `json:"updatedAt"`
+	DeletedAt   gorm.DeletedAt `json:"-" gorm:"index"` //软删除
+
+	// 关联用户信息
+	User User `gorm:"foreignKey:UserID" json:"user,omitempty"`
 }
 
 // UploadVideoPayload 视频上传请求

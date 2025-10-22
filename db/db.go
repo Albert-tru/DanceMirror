@@ -5,12 +5,17 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/Albert-tru/DanceMirror/config"
 	_ "github.com/go-sql-driver/mysql"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
-func NewMySQLStorage(cfg config.Config) (*sql.DB, error) {
+// NewMySQLStorage 创建并返回一个 MySQL 数据库连接
+func NewMySQLStorage(cfg config.Config) (*gorm.DB, error) {
 	var dsn string
 
 	log.Printf("DBAddress: %s, DBUser: %s", cfg.DBAddress, cfg.DBUser)
@@ -28,14 +33,27 @@ func NewMySQLStorage(cfg config.Config) (*sql.DB, error) {
 		log.Printf("Using TCP connection: %s", dsn)
 	}
 
-	db, err := sql.Open("mysql", dsn)
+	//打开一个dirverName指定的数据库，dataSourceName指定数据源
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Info), // 设置日志级别为 Info
+		NowFunc: func() time.Time {
+			return time.Now().In(time.FixedZone("CST", 8*3600)) // 设置为中国标准时间
+		},
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	if err := db.Ping(); err != nil {
+	// 获取底层的 sql.DB 对象以进行进一步配置
+	sqlDB, err := db.DB()
+	if err != nil {
 		return nil, err
 	}
+
+	// 设置连接池参数（根据需要调整）
+	sqlDB.SetMaxOpenConns(25)                 // 最大打开连接数
+	sqlDB.SetMaxIdleConns(25)                 // 最大空闲连接数
+	sqlDB.SetConnMaxLifetime(5 * time.Minute) // 连接最大生命周期
 
 	log.Println("✅ Database connected successfully!")
 	return db, nil

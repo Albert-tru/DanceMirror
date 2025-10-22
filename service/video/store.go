@@ -2,91 +2,51 @@ package video
 
 import (
 	"database/sql"
-	"fmt"
+
+	"gorm.io/gorm"
 
 	"github.com/Albert-tru/DanceMirror/types"
 )
 
 type Store struct {
-	db *sql.DB
+	db *gorm.DB
 }
 
-func NewStore(db *sql.DB) *Store {
+func NewStore(db *gorm.DB) *Store {
 	return &Store{db: db}
 }
 
 func (s *Store) GetVideoByID(id int) (*types.Video, error) {
-	rows, err := s.db.Query("SELECT * FROM videos WHERE id = ?", id)
-	if err != nil {
-		return nil, err
+	var video *types.Video
+	result := s.db.First(&video, id)
+	if result.Error != nil {
+		return nil, result.Error
 	}
-	defer rows.Close()
-
-	v := new(types.Video)
-	for rows.Next() {
-		v, err = scanRowIntoVideo(rows)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if v.ID == 0 {
-		return nil, fmt.Errorf("video not found")
-	}
-
-	return v, nil
+	return video, nil
 }
 
 func (s *Store) GetVideos(userID int) ([]*types.Video, error) {
-	rows, err := s.db.Query("SELECT * FROM videos WHERE userId = ? ORDER BY createdAt DESC", userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
+	var videos []types.Video
+	result := s.db.Where("user_id = ?", userID).Order("created_at DESC").Find(&videos)
 
-	videos := []*types.Video{}
-	for rows.Next() {
-		v, err := scanRowIntoVideo(rows)
-		if err != nil {
-			return nil, err
-		}
-		videos = append(videos, v)
+	videoPtrs := make([]*types.Video, len(videos))
+	for i := range videos {
+		videoPtrs[i] = &videos[i]
 	}
 
-	return videos, nil
+	return videoPtrs, result.Error
 }
 
 func (s *Store) CreateVideo(video *types.Video) error {
-	result, err := s.db.Exec(`
-INSERT INTO videos (userId, title, description, filePath, fileName, fileSize, duration, thumbnail) 
-VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		video.UserID, video.Title, video.Description, video.FilePath,
-		video.FileName, video.FileSize, video.Duration, video.Thumbnail)
-	if err != nil {
-		return err
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		return err
-	}
-
-	video.ID = int(id)
-	return nil
+	return s.db.Create(video).Error
 }
 
 func (s *Store) UpdateVideo(video *types.Video) error {
-	_, err := s.db.Exec(`
-UPDATE videos 
-SET title = ?, description = ?, duration = ?, thumbnail = ?, updatedAt = NOW() 
-WHERE id = ?`,
-		video.Title, video.Description, video.Duration, video.Thumbnail, video.ID)
-	return err
+	return s.db.Save(video).Error
 }
 
 func (s *Store) DeleteVideo(id int) error {
-	_, err := s.db.Exec("DELETE FROM videos WHERE id = ?", id)
-	return err
+	return s.db.Delete(&types.Video{}, id).Error // 软删除
 }
 
 func scanRowIntoVideo(rows *sql.Rows) (*types.Video, error) {

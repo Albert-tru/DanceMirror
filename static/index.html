@@ -372,7 +372,9 @@
             desc.textContent = video.description || '暂无描述';
             
             const videoEl = document.createElement('video');
-            videoEl.src = `/${video.filePath}`;
+            // 从 /app/uploads/xxx.mp4 转换为 /uploads/xxx.mp4
+            const videoPath = video.filePath.replace('/app/uploads/', '/uploads/');
+            videoEl.src = videoPath;
             videoEl.controls = true;
             
             const date = document.createElement('p');

@@ -5,90 +5,58 @@ import (
 	"fmt"
 
 	"github.com/Albert-tru/DanceMirror/types"
+	"gorm.io/gorm"
 )
 
 type Store struct {
-	db *sql.DB
+	db *gorm.DB
 }
 
-func NewStore(db *sql.DB) *Store {
+func NewStore(db *gorm.DB) *Store {
 	return &Store{db: db}
 }
 
 func (s *Store) GetUserByEmail(email string) (*types.User, error) {
-	rows, err := s.db.Query("SELECT * FROM users WHERE email = ?", email)
-	if err != nil {
-		return nil, err
+	var user types.User
+	result := s.db.Where("email = ?", email).First(&user)
+	if result.Error != nil {
+		return nil, result.Error
 	}
-	defer rows.Close()
-
-	u := new(types.User)
-	for rows.Next() {
-		u, err = scanRowIntoUser(rows)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if u.ID == 0 {
-		return nil, fmt.Errorf("user not found")
-	}
-
-	return u, nil
+	return &user, nil
 }
 
 func (s *Store) GetUserByPhone(phone string) (*types.User, error) {
-	rows, err := s.db.Query("SELECT * FROM users WHERE phone = ?", phone)
-	if err != nil {
-		return nil, err
+	var user types.User
+	result := s.db.Where("phone = ?", phone).First(&user)
+	if result.Error != nil {
+		return nil, result.Error
 	}
-	defer rows.Close()
-
-	u := new(types.User)
-	for rows.Next() {
-		u, err = scanRowIntoUser(rows)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if u.ID == 0 {
-		return nil, fmt.Errorf("user not found")
-	}
-
-	return u, nil
+	return &user, nil
 }
 
 func (s *Store) GetUserByID(id int) (*types.User, error) {
-	rows, err := s.db.Query("SELECT * FROM users WHERE id = ?", id)
-	if err != nil {
-		return nil, err
+	var user types.User
+	result := s.db.First(&user, id)
+	if result.Error != nil {
+		return nil, result.Error
 	}
-	defer rows.Close()
-
-	u := new(types.User)
-	for rows.Next() {
-		u, err = scanRowIntoUser(rows)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if u.ID == 0 {
-		return nil, fmt.Errorf("user not found")
-	}
-
-	return u, nil
+	return &user, nil
 }
 
 func (s *Store) CreateUser(user types.User) error {
-	_, err := s.db.Exec("INSERT INTO users (email, phone, password, firstName, lastName) VALUES (?, ?, ?, ?, ?)",
-		user.Email, user.Phone, user.Password, user.FirstName, user.LastName)
-	if err != nil {
-		return err
+	result := s.db.Create(&user)
+	if result.Error != nil {
+		return fmt.Errorf("failed to create user: %w", result.Error)
 	}
-
 	return nil
+}
+
+func (s *Store) UpdateUser(user *types.User) error {
+	return s.db.Save(user).Error
+}
+
+func (s *Store) DeleteUser(id uint) error {
+	return s.db.Delete(&types.User{}, id).Error // 软删除
 }
 
 func scanRowIntoUser(rows *sql.Rows) (*types.User, error) {
