@@ -8,7 +8,7 @@ const DanceMirrorAPI = (function() {
 
     // 配置
     const config = {
-        apiBase: 'http://192.168.20.116:8080/api/v1',
+        apiBase: '/api/v1',
         tokenKey: 'token',
         userKey: 'user'
     };

@@ -24,12 +24,11 @@
         @media (max-width:768px) { .compare-container { flex-direction:column; } }
         .recording-indicator { display:inline-block; width:10px; height:10px; background:#e74c3c; border-radius:50%; margin-right:5px; animation:blink 1s infinite; }
         @keyframes blink { 0%,50%{opacity:1}51%,100%{opacity:0.3} }
-        video.mirrored { transform: scaleX(-1); }
-        /* 模式切换按钮样式 */
+        .video-box video.mirrored { transform: scaleX(-1); }
+        /* 模式切换 */
         .mode-switcher { text-align:center; margin:12px 0; }
         .mode-switcher .btn { margin:0 6px; }
-
-        /* 裁剪面板样式 */
+        /* 裁剪面板 */
         .crop-panel { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); background:#fff; padding:16px; border-radius:8px; box-shadow:0 10px 30px rgba(0,0,0,0.2); z-index:10000; width:90%; max-width:900px; max-height:85vh; overflow:auto; }
         .crop-preview { position:relative; margin-top:12px; }
         #cropCanvas { width:100%; background:#000; border-radius:6px; display:block; }
@@ -38,28 +37,7 @@
         .ratio-btn.active { background:#007bff; color:#fff; border-color:#007bff; }
         .crop-actions { margin-top:12px; text-align:center; }
         .crop-close { position:absolute; right:12px; top:8px; cursor:pointer; font-weight:bold; }
-
-        /* 通用隐藏类 */
         .hidden { display:none !important; }
-
-        /* 视频信息默认隐藏 */
-        .video-info { display: none; }
-
-        /* 模式切换的核心逻辑 */
-        /* 默认状态下，隐藏单视频容器，显示对照容器 */
-        #singleVideoContainer { display: none; }
-        #comparisonContainer { display: flex; } /* 确保对照容器是 flex 布局 */
-
-        /* 当 body 有 mode-single class 时，反转显示状态 */
-        body.mode-single #singleVideoContainer { display: block; }
-        body.mode-single #comparisonContainer { display: none; }
-        body.mode-single #layoutControls { display: none !important; }
-        body.mode-single .sync-controls { display: none; }
-        body.mode-single #mirrorUser { display: none; }
-
-        /* 单视频播放器样式 */
-        #singleVideoContainer video { width: 100%; max-width: 960px; margin: 0 auto; display: block; }
-        #singleVideoContainer .single-video-info { display: none; }
     </style>
 </head>
 <body>
@@ -84,20 +62,17 @@
         </div>
         </div>
 
-        <div id="singleVideoContainer" class="video-container-hidden">
+        <div id="singleVideoContainer" class="video-container hidden">
             <h3>📺 单视频观看</h3>
             <video id="singleVideo" controls crossorigin="anonymous"></video>
-            
-            <div id="singleControls" class="master-controls" style="justify-content: center; margin-top: 10px;">
-                <button class="btn" id="singlePlayBtn">▶️ 播放</button>
-                <button class="btn" id="singlePauseBtn">⏸️ 暂停</button>
-                <button class="btn" id="singleRestartBtn">⏮️ 重新开始</button>
-                <button class="btn" id="singleLoopToggle">🔄 循环播放</button>
+            <div style="margin-top:8px;">
+                <h4 id="singleVideoTitle"></h4>
+                <p id="singleVideoDesc" style="color:#666;"></p>
             </div>
         </div>
 
         <div class="compare-container" id="comparisonContainer">
-            <div class="video-box original-video-box">
+            <div class="video-box">
                 <h3>📺 原视频（主控）</h3>
                 <video id="originalVideo" controls crossorigin="anonymous"></video>
                 <div class="video-info" style="margin-top:10px;">
@@ -106,7 +81,7 @@
                 </div>
             </div>
 
-            <div class="video-box user-video-box">
+            <div class="video-box">
                 <h3>🎥 你的录制 / 本地视频</h3>
                 <video id="userVideo" controls muted></video>
                 <div class="record-controls">
@@ -129,7 +104,6 @@
                 <button class="btn" id="masterPlay">▶️ 播放</button>
                 <button class="btn" id="masterPause">⏸️ 暂停</button>
                 <button class="btn" id="masterRestart">⏮️ 重新开始</button>
-                <button class="btn" id="masterLoopToggle">🔄 循环播放</button>
             </div>
             <div class="offset-control">
                 <label>⏱️ 同步偏移（右侧视频延迟/提前秒数）：</label>
@@ -144,14 +118,11 @@
                 <div style="text-align:center; margin-top:8px; font-weight:bold; color:#667eea;">当前速度: <span id="currentSpeed">1.0x</span></div>
                 <h3>⏱️ 播放速度</h3>
                 <div class="speed-buttons">
-                    <button class="btn" data-speed="0.6">0.6x</button>
-                    <button class="btn" data-speed="0.7">0.7x</button>
-                    <button class="btn" data-speed="0.8">0.8x</button>
-                    <button class="btn" data-speed="0.9">0.9x</button>
+                    <button class="btn" data-speed="0.5">0.5x</button>
+                    <button class="btn" data-speed="0.75">0.75x</button>
                     <button class="btn active" data-speed="1.0">1.0x</button>
-                    <button class="btn" data-speed="1.1">1.1x</button>
-                    <button class="btn" data-speed="1.2">1.2x</button>
-
+                    <button class="btn" data-speed="1.25">1.25x</button>
+                    <button class="btn" data-speed="1.5">1.5x</button>
                 </div>
             </div>
 
@@ -204,9 +175,6 @@
         // elements
         const originalVideo = document.getElementById('originalVideo');
         const userVideo = document.getElementById('userVideo');
-        const singleVideo = document.getElementById('singleVideo');
-        const singleVideoTitle = document.getElementById('singleVideoTitle');
-        const singleVideoDesc = document.getElementById('singleVideoDesc');
         const offsetRange = document.getElementById('offsetRange');
         const offsetValue = document.getElementById('offsetValue');
         const offsetLabel = document.getElementById('offsetLabel');
@@ -217,7 +185,6 @@
         let currentVideoId = null;
         let mediaRecorder = null, recordedChunks = [], recordedBlob = null;
         let recStartTime = 0, recTimerInterval = null;
-        let isSingleMode = false;
 
         // cropper state
         const cropPanel = document.getElementById('cropPanel');
@@ -239,133 +206,21 @@
             initLayoutControls();
             initLocalUpload();
             initMiscControls();
-            initSingleControls(); // 新增：初始化单视频控制绑定
             loadVideos();
         };
 
         // ---------- sync controls ----------
         function initSyncControls(){
-            offsetRange.addEventListener('input', (e)=>{
-                syncOffset = parseFloat(e.target.value);
-                offsetValue.value = syncOffset;
-                offsetLabel.textContent = syncOffset.toFixed(1)+'s';
-            });
-            offsetValue.addEventListener('change', (e)=>{
-                syncOffset = parseFloat(e.target.value) || 0;
-                offsetRange.value = syncOffset;
-                offsetLabel.textContent = syncOffset.toFixed(1)+'s';
-            });
-
-            // 这些主控按钮只在“对照模式”下起作用
-            document.getElementById('masterPlay').addEventListener('click', ()=> {
-                if (!isSingleMode) originalVideo.play().catch(()=>{});
-            });
-            document.getElementById('masterPause').addEventListener('click', ()=> {
-                if (!isSingleMode) originalVideo.pause();
-            });
-            document.getElementById('masterRestart').addEventListener('click', ()=> {
-                if (!isSingleMode) {
-                    originalVideo.currentTime = 0;
-                    syncUserVideoTime();
-                    originalVideo.play().catch(()=>{});
-                }
-            });
-
-            // 新增：主控循环播放按钮逻辑
-            const masterLoopBtn = document.getElementById('masterLoopToggle');
-            masterLoopBtn.addEventListener('click', () => {
-                const shouldLoop = !originalVideo.loop;
-                originalVideo.loop = shouldLoop;
-                if (userVideo) userVideo.loop = shouldLoop;
-                masterLoopBtn.classList.toggle('active', shouldLoop);
-                showMessage('主视频循环: ' + (shouldLoop ? '开启' : '关闭'), 'success', 1200);
-            });
-
-            // 这些事件监听也只在“对照模式”下生效
-            originalVideo.addEventListener('play', ()=> {
-                if (isSingleMode) return;
-                try { if (userVideo.src) userVideo.play(); } catch (e) {}
-            });
-            originalVideo.addEventListener('pause', ()=> {
-                if (isSingleMode) return;
-                try { userVideo.pause(); } catch (e) {}
-            });
-            originalVideo.addEventListener('seeked', ()=> {
-                if (isSingleMode) return;
-                syncUserVideoTime();
-            });
-            // 注意：timeupdate 事件在切换模式时需要特殊处理，见 initModeSwitcher
+            offsetRange.addEventListener('input', (e)=>{ syncOffset = parseFloat(e.target.value); offsetValue.value = syncOffset; offsetLabel.textContent = syncOffset.toFixed(1)+'s'; });
+            offsetValue.addEventListener('change', (e)=>{ syncOffset = parseFloat(e.target.value)||0; offsetRange.value = syncOffset; offsetLabel.textContent = syncOffset.toFixed(1)+'s'; });
+            document.getElementById('masterPlay').addEventListener('click', ()=> originalVideo.play());
+            document.getElementById('masterPause').addEventListener('click', ()=> originalVideo.pause());
+            document.getElementById('masterRestart').addEventListener('click', ()=> { originalVideo.currentTime = 0; syncUserVideoTime(); });
+            originalVideo.addEventListener('play', ()=> { try { if (userVideo.src) userVideo.play(); } catch(e){} });
+            originalVideo.addEventListener('pause', ()=> { try{ userVideo.pause(); }catch(e){} });
+            originalVideo.addEventListener('seeked', ()=> syncUserVideoTime());
+            originalVideo.addEventListener('timeupdate', ()=> syncUserVideoTime());
         }
-
-        // ---------- 单视频控制 ----------
-        function initSingleControls(){
-            // ✅ 修正：使用正确的按钮 ID
-            const playBtn = document.getElementById('singlePlayBtn');
-            const pauseBtn = document.getElementById('singlePauseBtn');
-            const restartBtn = document.getElementById('singleRestartBtn');
-
-            if (playBtn) playBtn.addEventListener('click', ()=> {
-                if (singleVideo && singleVideo.src) singleVideo.play().catch(()=>{});
-                else showMessage('单视频未加载', 'error');
-            });
-            if (pauseBtn) pauseBtn.addEventListener('click', ()=> {
-                if (singleVideo) singleVideo.pause();
-            });
-            if (restartBtn) restartBtn.addEventListener('click', ()=> {
-                if (singleVideo && singleVideo.src) {
-                    try { singleVideo.currentTime = 0; singleVideo.play().catch(()=>{}); } catch(e){ }
-                }
-            });
-            
-            // 新增：单视频循环播放按钮逻辑
-            const singleLoopBtn = document.getElementById('singleLoopToggle');
-            singleLoopBtn.addEventListener('click', () => {
-                const shouldLoop = !singleVideo.loop;
-                singleVideo.loop = shouldLoop;
-                singleLoopBtn.classList.toggle('active', shouldLoop);
-                showMessage('单视频循环: ' + (shouldLoop ? '开启' : '关闭'), 'success', 1200);
-            });       
-        }
-
-        // ---------- keyboard shortcuts（改为作用于当前模式的 activeVideo） ----------
-        document.addEventListener('keydown', (e)=>{
-            if (e.target.tagName==='INPUT' || e.target.tagName==='TEXTAREA') return;
-            
-            // 智能判断：获取当前正在显示的视频
-            const activeVideo = isSingleMode ? singleVideo : originalVideo;
-            if (!activeVideo) return; // 如果没有任何视频，则不执行操作
-
-            switch(e.code){
-                case 'Space':
-                    e.preventDefault();
-                    if (activeVideo.paused) activeVideo.play().catch(()=>{}); else activeVideo.pause();
-                    break;
-                case 'ArrowLeft':
-                    e.preventDefault();
-                    activeVideo.currentTime = Math.max(0, (activeVideo.currentTime || 0) - 5);
-                    break;
-                case 'ArrowRight':
-                    e.preventDefault();
-                    activeVideo.currentTime = Math.min((activeVideo.duration || 0), (activeVideo.currentTime || 0) + 5);
-                    break;
-                case 'KeyM':
-                    // 调用我们已经修正过的智能函数
-                    toggleMirror('original');
-                    break;
-                case 'KeyA':
-                    // 调用我们已经修正过的智能函数
-                    setPointA();
-                    break;
-                case 'KeyB':
-                    // 调用我们已经修正过的智能函数
-                    setPointB();
-                    break;
-                case 'KeyL':
-                    // 调用我们已经修正过的智能函数
-                    startABLoop();
-                    break;
-            }
-        });
 
         function syncUserVideoTime(){
             if (!userVideo.src || userVideo.readyState < 2) return;
@@ -494,20 +349,8 @@
 
         function selectVideo(video, itemEl){
             currentVideoId = video.id;
-            let videoPath = video.filePath || '';
-            if (!videoPath) {
-                showMessage('视频路径缺失', 'error');
-                return;
-            }
-            if (!/^https?:\/\//.test(videoPath)) {
-                videoPath = videoPath.replace(/^\/?app\//, '/');
-                videoPath = videoPath.replace(/^\/?uploads\//, '/uploads/');
-                videoPath = videoPath.replace(/^\/?static\//, '/static/');
-                if (!videoPath.startsWith('/')) {
-                    videoPath = '/' + videoPath.replace(/^\/+/, '');
-                }
-            }
-            originalVideo.src = videoPath;
+            // video.filePath 可能是相对路径，确保以 / 开头
+            const videoPath = video.filePath ? video.filePath.replace('/app/uploads/', '/uploads/') : ''; originalVideo.src = videoPath;
             originalVideo.load();
             document.getElementById('videoTitle').textContent = video.title || '未命名';
             document.getElementById('videoDescription').textContent = video.description || '暂无描述';
@@ -555,48 +398,13 @@
 
         function initModeSwitcher(){
             const sm = document.getElementById('singleModeBtn'), cm = document.getElementById('comparisonModeBtn');
-            const body = document.body;
             const single = document.getElementById('singleVideoContainer'), compare = document.getElementById('comparisonContainer');
-
-            // ensure initial UI state (remove persistent .hidden that was blocking display)
-            single.classList.remove('hidden');
-            compare.classList.remove('hidden');
-
-            // detect initial mode from body class (if any)
-            isSingleMode = body.classList.contains('mode-single');
-
-            // update button styles according to current mode
-            if (isSingleMode) { sm.classList.add('btn-primary'); cm.classList.remove('btn-primary'); }
-            else { cm.classList.add('btn-primary'); sm.classList.remove('btn-primary'); }
-
             sm.addEventListener('click', ()=> {
-                if (isSingleMode) return;
-                isSingleMode = true;
-                body.classList.add('mode-single'); // CSS will show single container
-                body.classList.remove('mode-comparison');
-                // copy source so single player is ready
+                single.classList.remove('hidden'); compare.classList.add('hidden');
                 const svid = document.getElementById('singleVideo');
-                try {
-                    if (originalVideo && originalVideo.currentSrc) {
-                        svid.src = originalVideo.currentSrc;
-                    } else if (originalVideo && originalVideo.src) {
-                        svid.src = originalVideo.src;
-                    }
-                    svid.load();
-                } catch(e){ console.warn('set single src failed', e); }
-                sm.classList.add('btn-primary'); cm.classList.remove('btn-primary');
-                // hide layout controls when single mode
-                document.getElementById('layoutControls').style.display = 'none';
+                if (originalVideo.src) { svid.src = originalVideo.src; svid.load(); document.getElementById('singleVideoTitle').textContent = document.getElementById('videoTitle').textContent; document.getElementById('layoutControls').style.display='none'; }
             });
-
-            cm.addEventListener('click', ()=> {
-                if (!isSingleMode) return;
-                isSingleMode = false;
-                body.classList.remove('mode-single');
-                body.classList.add('mode-comparison');
-                cm.classList.add('btn-primary'); sm.classList.remove('btn-primary');
-                document.getElementById('layoutControls').style.display = 'block';
-            });
+            cm.addEventListener('click', ()=> { single.classList.add('hidden'); compare.classList.remove('hidden'); document.getElementById('layoutControls').style.display='block'; });
         }
 
         // ---------- local upload ----------
@@ -619,201 +427,39 @@
 
         // ---------- misc controls ----------
         function initMiscControls(){
-            // 播放速度控制
             document.querySelectorAll('.speed-buttons .btn').forEach(b => b.addEventListener('click', (e)=> {
                 const s = parseFloat(b.dataset.speed || 1.0);
-                
-                // ✅ 智能判断：控制当前模式下的视频
-                const activeVideo = isSingleMode ? singleVideo : originalVideo;
-                if (activeVideo) activeVideo.playbackRate = s;
-                
-                // 在对照模式下，同时控制 userVideo
-                if (!isSingleMode && userVideo) userVideo.playbackRate = s;
-
+                originalVideo.playbackRate = s; userVideo.playbackRate = s;
                 document.querySelectorAll('.speed-buttons .btn').forEach(x=>x.classList.remove('active'));
                 b.classList.add('active');
                 const speedIndicator = document.getElementById('currentSpeed');
                 if (speedIndicator) speedIndicator.textContent = s + 'x';
                 showMessage('播放速度: ' + s + 'x', 'success', 1200);
             }));
-
-            // 镜面翻转控制
             document.getElementById('mirrorUser').addEventListener('click', ()=> toggleMirror('user'));
             document.getElementById('mirrorOriginal').addEventListener('click', ()=> toggleMirror('original'));
-            
-            // AB 循环控制
-            document.getElementById('setA').addEventListener('click', setPointA);
-            document.getElementById('setB').addEventListener('click', setPointB);
+            document.getElementById('setA').addEventListener('click', ()=> { pointA = originalVideo.currentTime; updateABInfo(); showMessage('A 点已设置: '+Utils.formatTime(pointA),'success'); });
+            document.getElementById('setB').addEventListener('click', ()=> { pointB = originalVideo.currentTime; updateABInfo(); showMessage('B 点已设置: '+Utils.formatTime(pointB),'success'); });
             document.getElementById('startLoop').addEventListener('click', startABLoop);
             document.getElementById('clearLoop').addEventListener('click', clearABLoop);
         }
 
-        /* --- START: 粘贴全新的 FFmpeg 辅助代码到这里 --- */
-
-        const FFmpegManager = (function() {
-            let ffmpeg = null;
-            let isLoading = false;
-            let isLoaded = false;
-
-            async function load() {
-                if (isLoaded) return ffmpeg;
-                if (isLoading) {
-                    // 如果正在加载，等待加载完成
-                    return new Promise((resolve, reject) => {
-                        const checkInterval = setInterval(() => {
-                            if (isLoaded) {
-                                clearInterval(checkInterval);
-                                resolve(ffmpeg);
-                            }
-                            if (!isLoading) { // 如果加载失败
-                                clearInterval(checkInterval);
-                                reject(new Error("FFmpeg loading was interrupted."));
-                            }
-                        }, 100);
-                    });
-                }
-
-                isLoading = true;
-                try {
-                    showMessage('首次加载 FFmpeg 核心文件（约30MB），请稍候...', 'info', 0);
-                    
-                    // 统一使用 0.12.x 版本，并使用多线程核心以获得更好性能
-                    const { createFFmpeg, fetchFile } = FFmpeg;
-                    ffmpeg = createFFmpeg({
-                        corePath: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js',
-                        log: true,
-                    });
-                    
-                    await ffmpeg.load();
-                    isLoaded = true;
-                    isLoading = false;
-                    showMessage('FFmpeg 加载成功!', 'success', 2000);
-                    return ffmpeg;
-                } catch (err) {
-                    isLoading = false;
-                    console.error("FFmpeg failed to load", err);
-                    showMessage('FFmpeg 核心加载失败: ' + err.message, 'error', 5000);
-                    throw err;
-                }           
-            }
-
-            async function runCrop(inputBlob, cropParams, opts = {}) {
-                const ffmpegInstance = await load();
-                const { fetchFile } = FFmpeg;
-                const { format = 'mp4', onProgress = () => {} } = opts;
-
-                const inputName = 'input.webm';
-                const outputName = `output.${format}`;
-
-                ffmpegInstance.FS('writeFile', inputName, await fetchFile(inputBlob));
-
-                ffmpegInstance.setProgress(({ ratio }) => {
-                    onProgress(Math.min(1, Math.max(0, ratio)));
-                });
-
-                const vf = `crop=${Math.round(cropParams.w)}:${Math.round(cropParams.h)}:${Math.round(cropParams.x)}:${Math.round(cropParams.y)}`;
-                
-                const args = [
-                    '-i', inputName,
-                    '-vf', vf,
-                    '-c:v', 'libx264',
-                    '-preset', 'veryfast',
-                    '-crf', '23',
-                    '-c:a', 'aac',
-                    '-movflags', '+faststart',
-                    outputName
-                ];
-
-                await ffmpegInstance.run(...args);
-
-                const data = ffmpegInstance.FS('readFile', outputName);
-                
-                // 清理文件系统
-                ffmpegInstance.FS('unlink', inputName);
-                ffmpegInstance.FS('unlink', outputName);
-
-                return new Blob([data.buffer], { type: `video/${format}` });
-            }
-
-            return {
-                runCrop: runCrop
-            };
-        })();
-
-        /* --- END: FFmpeg 辅助代码结束 --- */        
-
         function toggleMirror(target){
-            // ✅ 智能判断：如果目标是 original，但在单视频模式下，则翻转 singleVideo
-            const videoToMirror = (target === 'original' && isSingleMode) 
-                                  ? singleVideo 
-                                  : (target === 'original' ? originalVideo : userVideo);
-            
-            if (videoToMirror) {
-                videoToMirror.classList.toggle('mirrored');
-                let targetName = '视频';
-                if (videoToMirror === originalVideo) targetName = '原视频';
-                if (videoToMirror === userVideo) targetName = '录制视频';
-                if (videoToMirror === singleVideo) targetName = '单视频';
-                showMessage(targetName + (videoToMirror.classList.contains('mirrored') ? ' 镜像: 开启' : ' 镜像: 关闭'), 'success', 1200);
-            }
-        }
-
-        function setPointA() {
-            // ✅ 智能判断：从当前激活的视频获取时间
-            const activeVideo = isSingleMode ? singleVideo : originalVideo;
-            if (!activeVideo) return;
-            pointA = activeVideo.currentTime;
-            updateABInfo();
-            showMessage('A 点已设置: ' + Utils.formatTime(pointA), 'success');
-        }
-
-        function setPointB() {
-            // ✅ 智能判断：从当前激活的视频获取时间
-            const activeVideo = isSingleMode ? singleVideo : originalVideo;
-            if (!activeVideo) return;
-            pointB = activeVideo.currentTime;
-            updateABInfo();
-            showMessage('B 点已设置: ' + Utils.formatTime(pointB), 'success');
+            const v = target==='original' ? originalVideo : userVideo;
+            v.classList.toggle('mirrored');
+            showMessage((target==='original'?'原视频':'录制视频') + (v.classList.contains('mirrored') ? ' 镜像: 开启' : ' 镜像: 关闭'), 'success', 1200);
         }
 
         function startABLoop(){
-            if (pointA === null || pointB === null) { showMessage('请先设置 A/B 点','error'); return; }
-            if (pointA >= pointB) { showMessage('A 点必须小于 B 点','error'); return; }
-
-            // ✅ 智能判断：控制当前激活的视频
-            const activeVideo = isSingleMode ? singleVideo : originalVideo;
-            if (!activeVideo) return;
-
-            // 清除旧的监听，避免重复
-            originalVideo.removeEventListener('timeupdate', handleABLoop);
-            singleVideo.removeEventListener('timeupdate', handleABLoop);
-            
-            activeVideo.currentTime = pointA;
-            activeVideo.play().catch(()=>{});
-            activeVideo.addEventListener('timeupdate', handleABLoop); // ✅ 绑定到当前激活的视频
-            
+            if (pointA===null || pointB===null) { showMessage('请先设置 A/B 点','error'); return; }
+            if (pointA >= pointB) { showMessage('A 必须小于 B','error'); return; }
+            originalVideo.currentTime = pointA; originalVideo.play();
+            originalVideo.removeEventListener('timeupdate', handleABLoop); originalVideo.addEventListener('timeupdate', handleABLoop);
             showMessage('AB 循环已开始', 'success', 1200);
         }
-        function handleABLoop(){
-            // ✅ 智能判断：检查当前激活的视频
-            const activeVideo = isSingleMode ? singleVideo : originalVideo;
-            if (activeVideo && activeVideo.currentTime >= pointB) {
-                activeVideo.currentTime = pointA;
-            }
-        }
-
-        function clearABLoop(){
-            pointA = pointB = null;
-            // ✅ 清除所有视频的监听，确保干净
-            originalVideo.removeEventListener('timeupdate', handleABLoop);
-            singleVideo.removeEventListener('timeupdate', handleABLoop);
-            updateABInfo();
-            showMessage('已清除 AB 循环','success',1000);
-        }
-
-        function updateABInfo(){ 
-            document.getElementById('abInfo').textContent = 'A: ' + (pointA!==null?Utils.formatTime(pointA):'未设置') + ' | B: ' + (pointB!==null?Utils.formatTime(pointB):'未设置'); 
-        }
+        function handleABLoop(){ if (originalVideo.currentTime >= pointB) originalVideo.currentTime = pointA; }
+        function clearABLoop(){ pointA = pointB = null; originalVideo.removeEventListener('timeupdate', handleABLoop); updateABInfo(); showMessage('已清除 AB 循环','success',1000); }
+        function updateABInfo(){ document.getElementById('abInfo').textContent = 'A: ' + (pointA!==null?Utils.formatTime(pointA):'未设置') + ' | B: ' + (pointB!==null?Utils.formatTime(pointB):'未设置'); }
 
         // keyboard shortcuts
         document.addEventListener('keydown', (e)=>{
@@ -917,63 +563,209 @@
             if (activeCropper) { activeCropper.destroy(); activeCropper = null; }
             try { userVideo.pause(); } catch(e){}
         }
-        // ✅ 使用新的 applyCropBtn 事件监听器
-        document.getElementById('applyCropBtn').addEventListener('click', async () => {
-            const applyBtn = document.getElementById('applyCropBtn');
-            applyBtn.disabled = true;
-            applyBtn.textContent = '处理中...';
 
-            try {
-                if (!activeCropper || !activeCropper.crop) {
-                    throw new Error('未找到有效的裁剪区域。');
-                }
-                
-                let inputBlob = recordedBlob;
-                if (!inputBlob) {
-                    throw new Error('未找到可裁剪的视频源。');
-                }
+        // ---------- keyboard and misc ----------
+        function setPointA(){ pointA = originalVideo.currentTime; updateABInfo(); showMessage('A 点已设置: '+Utils.formatTime(pointA),'success'); }
+        function setPointB(){ pointB = originalVideo.currentTime; updateABInfo(); showMessage('B 点已设置: '+Utils.formatTime(pointB),'success'); }
+        function updateABInfo(){ document.getElementById('abInfo').textContent = 'A: ' + (pointA!==null?Utils.formatTime(pointA):'未设置') + ' | B: ' + (pointB!==null?Utils.formatTime(pointB):'未设置'); }
 
-                const cropParams = {
-                    x: activeCropper.crop.x,
-                    y: activeCropper.crop.y,
-                    w: activeCropper.crop.w,
-                    h: activeCropper.crop.h,
-                };
+        // Lightweight helper to load ffmpeg.wasm (CDN) and run a crop+transcode command.
+        // Usage:
+        //   await ensureFFmpeg();
+        //   const outBlob = await cropAndTranscode(recordedBlob, {x,y,w,h}, { format: 'mp4', onProgress: p => console.log(p) });
 
-                const outBlob = await FFmpegManager.runCrop(inputBlob, cropParams, {
-                    onProgress: (ratio) => {
-                        const percent = Math.round(ratio * 100);
-                        const msg = `转码中... ${percent}%`;
-                        showMessage(msg, 'info', 0);
-                        applyBtn.textContent = msg;
-                    }
-                });
+        async function loadScript(url) {
+            return new Promise((resolve, reject) => {
+                const s = document.createElement('script');
+                s.src = url;
+                s.onload = resolve;
+                s.onerror = reject;
+                document.head.appendChild(s);
+            });
+        }
 
-                showMessage('转码完成！', 'success', 2000);
-                
-                // 提供下载
-                const url = URL.createObjectURL(outBlob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `cropped_${Date.now()}.mp4`;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                URL.revokeObjectURL(url);
+        let _ffmpeg = null;
+        let _ffmpegLoaded = false;
 
-                closeCropPanel();
-
-            } catch (err) {
-                console.error('Crop and transcode failed:', err);
-                showMessage('处理失败: ' + err.message, 'error', 5000);
-            } finally {
-                applyBtn.disabled = false;
-                applyBtn.textContent = '✅ 应用裁剪并下载';
+        async function ensureFFmpeg({ log=false } = {}) {
+            if (window.createFFmpeg && window.fetchFile) {
+                // bundle already loaded via other script
+            } else {
+                // load distribution from unpkg (pin version as needed)
+                await loadScript('https://unpkg.com/@ffmpeg/ffmpeg@0.11.7/dist/ffmpeg.min.js');
             }
-        });
- 
+
+            if (!_ffmpeg) {
+                const { createFFmpeg, fetchFile } = FFmpeg; // global provided by ffmpeg.min.js
+                _ffmpeg = createFFmpeg({ log: !!log, corePath: 'https://unpkg.com/@ffmpeg/core@0.11.1/dist/ffmpeg-core.js' });
+            }
+
+            if (!_ffmpegLoaded) {
+                await _ffmpeg.load(); // 下载 wasm core 等，可能几十 MB，耗时
+                _ffmpegLoaded = true;
+            }
+
+            return _ffmpeg;
+        }
+
+        /**
+         * Crop + transcode input Blob using ffmpeg.wasm.
+         * @param {Blob} inputBlob  原始视频 Blob (webm/mp4...)
+         * @param {{x:number,y:number,w:number,h:number}} crop  裁剪区域（像素，基于 canvas 内部像素尺寸）
+         * @param {{format?:'mp4'|'webm', onProgress?:(ratio)=>void}} opts
+         * @returns {Blob} 转码后的 Blob
+         */
+        async function cropAndTranscode(inputBlob, crop, opts = {}) {
+            const ffmpeg = await ensureFFmpeg({ log: false });
+            const { fetchFile } = FFmpeg;
+            const format = opts.format || 'mp4';
+            const inputName = 'in.webm';
+            const outputName = format === 'mp4' ? 'out.mp4' : 'out.webm';
+
+            if (typeof opts.onProgress === 'function') {
+                ffmpeg.setProgress(({ ratio }) => {
+                    try { opts.onProgress(Math.min(1, Math.max(0, ratio))); } catch(e){ console.warn(e); }
+                });
+            }
+
+            // write input file (fetchFile converts Blob->Uint8Array)
+            ffmpeg.FS('writeFile', inputName, await fetchFile(inputBlob));
+
+            // build crop filter string
+            const vf = `crop=${crop.w}:${crop.h}:${crop.x}:${crop.y}`;
+
+            // choose codec args (keep reasonable defaults)
+            const codecArgs = format === 'mp4'
+                ? ['-c:v','libx264','-preset','veryfast','-crf','23','-c:a','aac','-b:a','128k']
+                : ['-c:v','libvpx-vp9','-b:v','1M','-c:a','libvorbis'];
+
+            // run ffmpeg: input -> crop -> encode
+            // Note: this can be extended for scaling, fps, filters etc.
+            const args = ['-i', inputName, '-vf', vf, ...codecArgs, outputName];
+
+            // Run ffmpeg (may take long on large videos and is CPU/memory heavy)
+            await ffmpeg.run(...args);
+
+            // read result
+            const data = ffmpeg.FS('readFile', outputName);
+            const outBlob = new Blob([data.buffer], { type: format === 'mp4' ? 'video/mp4' : 'video/webm' });
+
+            // cleanup to free wasm FS
+            try {
+                ffmpeg.FS('unlink', inputName);
+                ffmpeg.FS('unlink', outputName);
+            } catch (e) {}
+
+            return outBlob;
+        }
+
+        // export helpers to global for easy use in page scripts
+        window.FFmpegWASM = { ensureFFmpeg, cropAndTranscode };
     </script>
-    <!-- ✅ 修正：从 unpkg.com 更换为 cdn.jsdelivr.net -->
-    <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.min.js"></script>   
+</body>
+<!-- FFmpeg.wasm crop+transcode helper (appended) -->
+<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+<script>
+const FFmpegWASM = (function(){
+  let ffmpeg = null, loaded = false;
+  // keep a small rolling log of ffmpeg stdout/stderr
+  let _logs = [];
+  function pushLog(line){
+    _logs.push(String(line));
+    if(_logs.length>200) _logs.shift();
+  }
+  return {
+    ensure: async function({log=false}={}){
+      if (loaded && ffmpeg) return ffmpeg;
+      if (!window.FFmpeg) throw new Error('FFmpeg not found');
+      const { createFFmpeg, fetchFile } = FFmpeg;
+      ffmpeg = createFFmpeg({ log });
+      // attach a logger if supported
+      try{
+        ffmpeg.setLogger && ffmpeg.setLogger(({type, message})=>{ pushLog(type+': '+message); });
+      }catch(e){}
+      await ffmpeg.load();
+      ffmpeg._fetchFile = fetchFile;
+      loaded = true; return ffmpeg;
+    },
+    get: () => ffmpeg,
+    getRecentLogs: () => _logs.join('\n')
+  };
+})();
+
+async function cropAndTranscode(inputBlob, cropParams, opts={}){
+  const format = opts.format||'mp4';
+  const onProgress = typeof opts.onProgress==='function'?opts.onProgress:()=>{};
+  const ffmpeg = await FFmpegWASM.ensure({ log:false });
+  const fetchFile = ffmpeg._fetchFile;
+  const extIn = (inputBlob.type && inputBlob.type.includes('webm'))? 'webm':'mp4';
+  const inName = 'in.'+extIn; const outName = 'out.'+(format==='webm'?'webm':'mp4');
+  const data = await fetchFile(inputBlob);
+  try{ ffmpeg.FS('unlink', inName); }catch(e){}
+  try{ ffmpeg.FS('unlink', outName); }catch(e){}
+  ffmpeg.FS('writeFile', inName, data);
+  const cropFilter = `crop=${Math.round(cropParams.w)}:${Math.round(cropParams.h)}:${Math.round(cropParams.x)}:${Math.round(cropParams.y)}`;
+  const args = ['-hide_banner','-y','-i',inName,'-vf',cropFilter];
+  if(format==='mp4') args.push('-c:v','libx264','-preset','veryfast','-crf','28','-c:a','aac','-b:a','128k','-movflags','+faststart',outName);
+  else args.push('-c:v','libvpx','-b:v','1M','-c:a','libvorbis', outName);
+  ffmpeg.setProgress(({ratio})=>{ try{ onProgress(ratio); }catch(e){} });
+  try{
+    await ffmpeg.run(...args);
+  } catch(runErr){
+    // rethrow with ffmpeg logs if available
+    try{
+      const log = ffmpeg && ffmpeg._ffmpeg && ffmpeg._ffmpeg.FS ? '' : '';
+    } catch(e){}
+    var recent = (FFmpegWASM && FFmpegWASM.getRecentLogs) ? FFmpegWASM.getRecentLogs() : '';
+var tail = recent.split('\n').slice(-20).join('\n');
+var msg = 'ffmpeg.run failed: ' + (runErr && runErr.message ? runErr.message : String(runErr));
+if(tail) msg += '\n--- ffmpeg recent logs ---\n' + tail;
+throw new Error(msg);
+  }
+  const outData = ffmpeg.FS('readFile', outName);
+  const blob = new Blob([outData.buffer], { type: format==='mp4'?'video/mp4':'video/webm' });
+  try{ ffmpeg.FS('unlink', inName); }catch(e){}
+  try{ ffmpeg.FS('unlink', outName); }catch(e){}
+  return blob;
+}
+
+// Robust applyCrop handler: auto-init cropper, wait for readiness, fallback to full-canvas
+(function wireApplyCrop(){
+  const applyBtn = document.getElementById('applyCropBtn');
+  if(!applyBtn) return;
+  applyBtn.type='button';
+  applyBtn.addEventListener('click', async ()=>{
+    try{
+      // ensure cropper
+      if(!window.activeCropper){
+        if(window.cropCanvas){
+          try{ userVideo.pause(); userVideo.currentTime = Math.min(userVideo.duration||0,0); userVideo.play().catch(()=>{}); }catch(e){}
+          activeCropper = new VideoCropper(userVideo, cropCanvas); activeCropper.init(); await new Promise(r=>setTimeout(r,150));
+        }else if(window.userVideo && userVideo.readyState>=2){
+          const off=document.createElement('canvas'); const w=userVideo.videoWidth||640,h=userVideo.videoHeight||360; off.width=w; off.height=h; const ctx=off.getContext('2d'); try{ctx.drawImage(userVideo,0,0,w,h);}catch(e){}
+          activeCropper={canvas:off, crop:{x:0,y:0,w:w,h:h}};
+        }
+      }
+      let waited=0; while((!activeCropper||!activeCropper.crop) && waited<1500){ await new Promise(r=>setTimeout(r,100)); waited+=100; }
+      if(!activeCropper||!activeCropper.crop){ if(activeCropper&&activeCropper.canvas){ activeCropper.crop={x:0,y:0,w:activeCropper.canvas.width,h:activeCropper.canvas.height}; } else { if(typeof showMessage==='function') showMessage('未选择裁剪区域，且无法自动初始化裁剪器，请先打开裁剪面板并等待视频加载','error'); return; } }
+
+      if(typeof showMessage==='function') showMessage('准备 ffmpeg（首次加载可能较慢）...', 'info', 0);
+      await FFmpegWASM.ensure({ log:false });
+
+      let inputBlob=null;
+      if(typeof recordedBlob!=='undefined' && recordedBlob) inputBlob = recordedBlob instanceof Blob?recordedBlob:new Blob([recordedBlob]);
+      else if(window.userVideo && userVideo.src){ const resp = await fetch(userVideo.src); if(!resp.ok) throw new Error('无法获取视频源: '+resp.status); inputBlob = await resp.blob(); }
+      if(!inputBlob){ if(typeof showMessage==='function') showMessage('未找到输入视频','error'); return; }
+      if(typeof showMessage==='function') showMessage('开始转码（浏览器端）...', 'info', 0);
+
+      const c = activeCropper.crop; const cropParams = { x: Math.max(0,Math.round(c.x)), y: Math.max(0,Math.round(c.y)), w: Math.max(1,Math.round(c.w)), h: Math.max(1,Math.round(c.h)) };
+      const outBlob = await cropAndTranscode(inputBlob, cropParams, { format:'mp4', onProgress: (r)=>{ if(typeof showMessage==='function') showMessage('转码进度: '+Math.round(r*100)+'%','info',0); } });
+      if(!outBlob) throw new Error('转码未生成输出');
+      recordedBlob = outBlob; const dl=document.getElementById('downloadRecBtn'); if(dl)dl.disabled=false; const up=document.getElementById('uploadRecBtn'); if(up)up.disabled=false;
+      const url = URL.createObjectURL(outBlob); const a=document.createElement('a'); a.href=url; a.download='crop_'+Date.now()+'.mp4'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+      if(typeof showMessage==='function') showMessage('转码完成，已设置为可上传的录制文件','success',4000); if(typeof closeCropPanel==='function') closeCropPanel();
+    }catch(err){ console.error('Crop transcode failed', err); if(typeof showMessage==='function') showMessage('转码失败: '+(err&&err.message?err.message:err),'error',8000);}  });
+})();
+</script>
 </body>
 </html>

@@ -20,8 +20,14 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// 2. 获取底层的 sql.DB 对象
+	sqlDB, err := database.DB()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	// 2. 创建迁移驱动
-	driver, err := mysql.WithInstance(database, &mysql.Config{})
+	driver, err := mysql.WithInstance(sqlDB, &mysql.Config{})
 	if err != nil {
 		log.Fatal(err)
 	}

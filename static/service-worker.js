@@ -1,7 +1,7 @@
 // Service Worker v1.0
-const CACHE_NAME = 'dancemirror-v1';
+const CACHE_NAME = 'dancemirror-v1.1';
 const urlsToCache = [
-  '/static/index.html',
+  '/static/',
   '/static/css/common.css',
   '/static/css/auth.css',
   '/static/js/api.js',
