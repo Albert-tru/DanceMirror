@@ -7,11 +7,12 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: dancemirror-app
-    network_mode: host
+    ports: # ✅ 新增：把应用的端口暴露给你的电脑
+      - "8080:8080"
     environment:
       # 从 .env 文件读取或在此覆盖
       - PORT=8080
-      - DB_HOST=localhost
+      - DB_HOST=db
       - DB_PORT=3306
       - DB_USER=root
       - DB_PASSWORD=MySQL666
@@ -28,16 +29,18 @@ services:
       db:
         condition: service_healthy
     restart: unless-stopped
+    networks: # <--- 2. 新增这一整个部分
+      - dancemirror-network
 
   # MySQL 数据库服务
   db:
-    image: mysql:8.0
+    build:
+      context: ./docker/mysql
+      dockerfile: Dockerfile
     container_name: dancemirror-db
     environment:
       MYSQL_ROOT_PASSWORD: MySQL666
       MYSQL_DATABASE: dancemirror
-      MYSQL_CHARACTER_SET_SERVER: utf8mb4
-      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
     ports:
       - "3306:3306"
     volumes:

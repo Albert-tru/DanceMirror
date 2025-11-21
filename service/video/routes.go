@@ -145,11 +145,22 @@ func (h *Handler) handleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	// 验证文件类型
+	// 验证文件类型（修改这部分）
 	contentType := header.Header.Get("Content-Type")
+
+	// 优先检查 Content-Type
 	if !isValidVideoType(contentType) {
-		utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("invalid file type: %s", contentType))
-		return
+		// 如果 Content-Type 是 application/octet-stream，则检查文件扩展名
+		if contentType == "application/octet-stream" {
+			if !isValidVideoExtension(header.Filename) {
+				utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("invalid file type: %s (filename: %s)", contentType, header.Filename))
+				return
+			}
+			// 扩展名有效，继续处理
+		} else {
+			utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("invalid file type: %s", contentType))
+			return
+		}
 	}
 
 	// 生成唯一文件名
@@ -274,6 +285,19 @@ func isValidVideoType(contentType string) bool {
 
 	for _, t := range validTypes {
 		if t == contentType {
+			return true
+		}
+	}
+	return false
+}
+
+// 新增：根据文件名检查是否为视频文件
+func isValidVideoExtension(filename string) bool {
+	ext := strings.ToLower(filepath.Ext(filename))
+	validExts := []string{".mp4", ".mpeg", ".mpg", ".mov", ".avi", ".wmv", ".webm", ".mkv"}
+
+	for _, validExt := range validExts {
+		if ext == validExt {
 			return true
 		}
 	}

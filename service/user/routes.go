@@ -45,6 +45,15 @@ func (h *Handler) handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 检查邮箱是否已存在（如果提供了邮箱）
+	if payload.Email != "" {
+		_, err = h.store.GetUserByEmail(payload.Email)
+		if err == nil {
+			utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("邮箱 %s 已被注册", payload.Email))
+			return
+		}
+	}
+
 	// 加密密码
 	hashedPassword, err := auth.HashPassword(payload.Password)
 	if err != nil {
@@ -56,6 +65,7 @@ func (h *Handler) handleRegister(w http.ResponseWriter, r *http.Request) {
 	err = h.store.CreateUser(types.User{
 		Phone:     payload.Phone,
 		Password:  hashedPassword,
+		Email:     payload.Email,
 		FirstName: payload.FirstName,
 		LastName:  payload.LastName,
 	})
@@ -107,6 +117,7 @@ func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 		"user": map[string]interface{}{
 			"id":        u.ID,
 			"phone":     u.Phone,
+			"email":     u.Email,
 			"firstName": u.FirstName,
 			"lastName":  u.LastName,
 		},

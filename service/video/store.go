@@ -27,7 +27,7 @@ func (s *Store) GetVideoByID(id int) (*types.Video, error) {
 
 func (s *Store) GetVideos(userID int) ([]*types.Video, error) {
 	var videos []types.Video
-	result := s.db.Where("user_id = ?", userID).Order("created_at DESC").Find(&videos)
+	result := s.db.Where("userId = ?", userID).Order("createdAt DESC").Find(&videos)
 
 	videoPtrs := make([]*types.Video, len(videos))
 	for i := range videos {
