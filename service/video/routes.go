@@ -3,6 +3,7 @@ package video
 import (
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/Albert-tru/DanceMirror/config"
 	"github.com/Albert-tru/DanceMirror/service/auth"
+	"github.com/Albert-tru/DanceMirror/service/cache"
 	"github.com/Albert-tru/DanceMirror/types"
 	"github.com/Albert-tru/DanceMirror/utils"
 	"github.com/gorilla/mux"
@@ -20,12 +22,14 @@ import (
 type Handler struct {
 	store     types.VideoStore
 	userStore types.UserStore
+	cache     *cache.RedisClient
 }
 
-func NewHandler(store types.VideoStore, userStore types.UserStore) *Handler {
+func NewHandler(store types.VideoStore, userStore types.UserStore, cache *cache.RedisClient) *Handler {
 	return &Handler{
 		store:     store,
 		userStore: userStore,
+		cache:     cache,
 	}
 }
 
@@ -46,17 +50,31 @@ func (h *Handler) RegisterRoutes(router *mux.Router) {
 
 func (h *Handler) handleGetVideos(w http.ResponseWriter, r *http.Request) {
 	userID := auth.GetUserIDFromContext(r.Context())
-	if userID == -1 {
-		utils.WriteError(w, http.StatusUnauthorized, fmt.Errorf("unauthorized"))
+
+	// 1. 先尝试从缓存获取视频列表
+	videos, err := h.cache.GetUserVideos(userID)
+	if err == nil {
+		// 缓存命中，直接返回
+		log.Printf("✅ 缓存命中 - 用户 %d 的视频列表", userID)
+		utils.WriteJSON(w, http.StatusOK, videos)
 		return
 	}
 
-	videos, err := h.store.GetVideos(userID)
+	// 2. 缓存未命中，查询数据库
+	log.Printf("⚠️  缓存未命中 - 查询数据库 (原因: %v)", err)
+	videos, err = h.store.GetVideos(userID) // 直接复用 videos 变量
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, err)
 		return
 	}
 
+	// 3. 将从数据库查到的结果存入缓存
+	if err := h.cache.CacheUserVideos(userID, videos); err != nil {
+		// 缓存失败不应阻塞主流程，记录日志即可
+		log.Printf("警告：缓存用户 %d 的视频列表失败: %v", userID, err)
+	}
+
+	// 4. 返回从数据库查到的结果
 	utils.WriteJSON(w, http.StatusOK, videos)
 }
 
@@ -94,7 +112,20 @@ func (h *Handler) handleGetVideo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 权限验证
+	//尝试从缓存获取视频信息
+	cacheVideo, err := h.cache.GetVideoByID(id)
+	if err == nil {
+		// 权限验证
+		userID := auth.GetUserIDFromContext(r.Context())
+		if cacheVideo.UserID == userID {
+			log.Printf("✅ 缓存命中 - 视频 ID %d", id)
+			utils.WriteJSON(w, http.StatusOK, cacheVideo)
+			return
+		}
+	}
+
+	log.Printf("⚠️  缓存未命中 - 查询数据库 视频 ID %d (原因: %v)", id, err)
+	// 从数据库获取视频信息
 	video, err := h.checkVideoOwnership(w, r, id)
 	if err != nil {
 		if err.Error() == "unauthorized" {
@@ -105,6 +136,11 @@ func (h *Handler) handleGetVideo(w http.ResponseWriter, r *http.Request) {
 			utils.WriteError(w, http.StatusForbidden, err)
 		}
 		return
+	}
+
+	// 将视频信息缓存起来
+	if err := h.cache.CacheVideoByID(video); err != nil {
+		log.Printf("警告：缓存视频 ID %d 失败: %v", id, err)
 	}
 
 	utils.WriteJSON(w, http.StatusOK, video)
@@ -226,6 +262,13 @@ func (h *Handler) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	//上传成功后，清除该用户的视频列表缓存
+	if err := h.cache.ClearUserVideosCache(userID); err != nil {
+		log.Printf("警告：清除用户 %d 视频列表缓存失败: %v", userID, err)
+	} else {
+		log.Printf("✅ 成功清除用户 %d 视频列表缓存", userID)
+	}
+
 	utils.WriteJSON(w, http.StatusCreated, video)
 }
 
@@ -257,6 +300,19 @@ func (h *Handler) handleDeleteVideo(w http.ResponseWriter, r *http.Request) {
 	if err := h.store.DeleteVideo(id); err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, fmt.Errorf("failed to delete video record: %v", err))
 		return
+	}
+
+	// 删除缓存
+	userID := auth.GetUserIDFromContext(r.Context())
+	if err := h.cache.ClearUserVideosCache(userID); err != nil {
+		log.Printf("警告：清除用户 %d 视频列表缓存失败: %v", userID, err)
+	} else {
+		log.Printf("✅ 成功清除用户 %d 视频列表缓存", userID)
+	}
+	if err := h.cache.ClearVideoCache(id); err != nil {
+		log.Printf("警告：删除视频 ID %d 缓存失败: %v", id, err)
+	} else {
+		log.Printf("✅ 成功删除视频 ID %d 缓存", id)
 	}
 
 	// 删除物理文件 - 将Web路径转换为文件系统路径

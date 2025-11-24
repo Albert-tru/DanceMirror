@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/Albert-tru/DanceMirror/service/cache"
 	"github.com/Albert-tru/DanceMirror/service/user"
 	"github.com/Albert-tru/DanceMirror/service/video"
 	"github.com/gorilla/mux"
@@ -14,15 +15,17 @@ import (
 
 // APIServer 结构体：保存服务器需要的信息
 type APIServer struct {
-	addr string   // 服务器地址，比如 ":8080"
-	db   *gorm.DB // 数据库连接
+	addr  string             // 服务器地址，比如 ":8080"
+	db    *gorm.DB           // 数据库连接
+	cache *cache.RedisClient // Redis 客户端
 }
 
 // NewAPIServer 创建一个新的服务器实例
-func NewAPIServer(addr string, db *gorm.DB) *APIServer {
+func NewAPIServer(addr string, db *gorm.DB, cache *cache.RedisClient) *APIServer {
 	return &APIServer{
-		addr: addr,
-		db:   db,
+		addr:  addr,
+		db:    db,
+		cache: cache,
 	}
 }
 
@@ -78,7 +81,7 @@ func (s *APIServer) Run() error {
 
 	// 5. 注册视频相关的路由（上传、查询、删除）
 	videoStore := video.NewStore(s.db)
-	videoHandler := video.NewHandler(videoStore, userStore)
+	videoHandler := video.NewHandler(videoStore, userStore, s.cache)
 	videoHandler.RegisterRoutes(subrouter)
 
 	// 6. 启动服务器，开始监听请求

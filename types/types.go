@@ -40,18 +40,18 @@ type LoginUserPayload struct {
 
 // Video 视频结构
 type Video struct {
-	ID          int        `json:"id" gorm:"primaryKey;autoIncrement"`
-	UserID      int        `json:"userId" gorm:"column:userId"` // 添加 gorm tag
-	Title       string     `json:"title" gorm:"not null"`
-	Description string     `json:"description"`
-	FilePath    string     `json:"filePath" gorm:"column:filePath;not null"` // 添加 gorm tag
-	FileName    string     `json:"fileName" gorm:"column:fileName;not null"` // 添加 gorm tag
-	FileSize    int64      `json:"fileSize" gorm:"column:fileSize;not null"` // 添加 gorm tag
-	Duration    float64    `json:"duration,omitempty"`
-	Thumbnail   string     `json:"thumbnail,omitempty"`
-	CreatedAt   time.Time  `json:"createdAt" gorm:"column:createdAt;autoCreateTime"`
-	UpdatedAt   time.Time  `json:"updatedAt" gorm:"column:updatedAt;autoUpdateTime"`
-	DeletedAt   *time.Time `json:"deletedAt,omitempty" gorm:"column:deletedAt;index"`
+	ID          int            `json:"id" gorm:"primaryKey;autoIncrement"`
+	UserID      int            `json:"userId" gorm:"column:userId"` // 添加 gorm tag
+	Title       string         `json:"title" gorm:"not null"`
+	Description string         `json:"description"`
+	FilePath    string         `json:"filePath" gorm:"column:filePath;not null"` // 添加 gorm tag
+	FileName    string         `json:"fileName" gorm:"column:fileName;not null"` // 添加 gorm tag
+	FileSize    int64          `json:"fileSize" gorm:"column:fileSize;not null"` // 添加 gorm tag
+	Duration    float64        `json:"duration,omitempty"`
+	Thumbnail   string         `json:"thumbnail,omitempty"`
+	CreatedAt   time.Time      `json:"createdAt" gorm:"column:createdAt;autoCreateTime"`
+	UpdatedAt   time.Time      `json:"updatedAt" gorm:"column:updatedAt;autoUpdateTime"`
+	DeletedAt   gorm.DeletedAt `json:"-" gorm:"column:deletedAt;index"`
 }
 
 // UploadVideoPayload 视频上传请求

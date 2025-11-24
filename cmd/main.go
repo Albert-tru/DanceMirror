@@ -7,6 +7,7 @@ import (
 	"github.com/Albert-tru/DanceMirror/cmd/api"
 	"github.com/Albert-tru/DanceMirror/config"
 	"github.com/Albert-tru/DanceMirror/db"
+	"github.com/Albert-tru/DanceMirror/service/cache"
 	"github.com/Albert-tru/DanceMirror/types"
 )
 
@@ -22,8 +23,15 @@ func main() {
 		log.Fatal("Failed to migrate database:", err)
 	}
 
+	//初始化redis
+	redisClient := cache.NewRedisClient(
+		config.Envs.RedisAddress,
+		config.Envs.RedisPassword,
+		config.Envs.RedisDB,
+	)
+
 	// 3. 启动 Web 服务器[api.go]
-	server := api.NewAPIServer(":"+config.Envs.Port, database)
+	server := api.NewAPIServer(":"+config.Envs.Port, database, redisClient)
 	if err := server.Run(); err != nil {
 		log.Fatal(err)
 	}

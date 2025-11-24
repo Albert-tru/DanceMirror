@@ -9,12 +9,18 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
+	"time"
+
+	"context"
 
 	"github.com/Albert-tru/DanceMirror/config"
 	"github.com/Albert-tru/DanceMirror/service/auth"
+	"github.com/Albert-tru/DanceMirror/service/cache"
 	"github.com/Albert-tru/DanceMirror/types"
 	"github.com/gorilla/mux"
+	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -57,10 +63,21 @@ func setupTestHandler(t *testing.T) (*gorm.DB, *mux.Router, *types.User, string)
 	secret := []byte(config.Envs.JWTSecret)
 	token, _ := auth.CreateJWT(secret, testUser.ID)
 
+	// 创建redis缓存客户端
+	// 假设本地 Redis 用于测试，使用 DB 1 以免与开发数据冲突
+	redisAddr := "localhost:6379"
+	redisClient := cache.NewRedisClient(redisAddr, "", 1)
+
+	// 清空测试数据库
+	rawRedisClient := redis.NewClient(&redis.Options{Addr: redisAddr, DB: 1})
+	if err := rawRedisClient.FlushDB(context.Background()).Err(); err != nil {
+		t.Fatalf("无法清空 Redis 测试数据库: %v", err)
+	}
+
 	// 创建 Store 和 Handler
 	videoStore := NewStore(db)
 	userStore := &mockUserStore{db: db}
-	handler := NewHandler(videoStore, userStore)
+	handler := NewHandler(videoStore, userStore, redisClient)
 
 	// 创建路由
 	router := mux.NewRouter()
@@ -334,6 +351,10 @@ func TestHandleGetVideos(t *testing.T) {
 			db.Create(v)
 		}
 
+		t.Cleanup(func() {
+			db.Delete(&videos)
+		})
+
 		req := httptest.NewRequest(http.MethodGet, "/videos", nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 
@@ -352,10 +373,23 @@ func TestHandleGetVideos(t *testing.T) {
 	})
 
 	t.Run("should return empty list for user with no videos", func(t *testing.T) {
-		db.Exec("DELETE FROM videos")
+		// ❌ 不要再用 db.Exec("DELETE FROM videos")，这会影响其他并发测试。
+		// 我们需要的是隔离，而不是粗暴地清空。
 
+		// ⭐ 1. 为这个测试创建一个全新的、一次性的用户。
+		//    这个新用户（比如 ID 是 125）保证在数据库和缓存中都是完全干净的。
+		hashedPassword, _ := auth.HashPassword("newpass")
+		newUser := &types.User{Phone: "13900139000", Email: "new.user@example.com", Password: hashedPassword}
+		db.Create(newUser)
+		t.Cleanup(func() { db.Unscoped().Delete(newUser) }) // 确保测试后物理删除这个临时用户
+
+		// ⭐ 2. 为这个新用户生成一个专用的 token。
+		secret := []byte(config.Envs.JWTSecret)
+		newToken, _ := auth.CreateJWT(secret, newUser.ID)
+
+		// ⭐ 3. 使用新用户的 token 发起请求。
 		req := httptest.NewRequest(http.MethodGet, "/videos", nil)
-		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Authorization", "Bearer "+newToken)
 
 		rr := httptest.NewRecorder()
 		router.ServeHTTP(rr, req)
@@ -366,9 +400,8 @@ func TestHandleGetVideos(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, rr.Code)
 
-		var response []*types.Video
-		json.Unmarshal(rr.Body.Bytes(), &response)
-		assert.Equal(t, 0, len(response))
+		// ⭐ 4. 使用 JSONEq 更精确地判断响应是否为 "[]"
+		assert.JSONEq(t, `[]`, rr.Body.String(), "对于一个没有任何视频的新用户，应该返回一个空的 JSON 数组")
 	})
 
 	t.Run("should fail without authentication", func(t *testing.T) {
@@ -384,4 +417,114 @@ func TestHandleGetVideos(t *testing.T) {
 	})
 }
 
-// ... 其余测试保持不变
+// TestVideoCache 测试视频相关的缓存逻辑
+func TestVideoCache(t *testing.T) {
+	db, router, testUser, token := setupTestHandler(t)
+	defer db.Exec("DELETE FROM videos")
+	defer db.Exec("DELETE FROM users")
+
+	// 0. 初始化一个 Redis 客户端用于直接检查缓存
+	redisAddr := "localhost:6379"
+	redisClient := redis.NewClient(&redis.Options{Addr: redisAddr, DB: 1})
+	ctx := context.Background()
+	userVideosCacheKey := "user:" + strconv.Itoa(testUser.ID) + ":videos"
+
+	// 1. 首次请求视频列表，应该是缓存未命中
+	t.Run("should miss cache on first request", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/videos", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		rr := httptest.NewRecorder()
+		router.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+		// 验证缓存已被创建
+		exists, err := redisClient.Exists(ctx, userVideosCacheKey).Result()
+		assert.NoError(t, err)
+		assert.Equal(t, int64(1), exists, "首次请求后，用户视频列表缓存应存在")
+	})
+
+	// 2. 再次请求，应该是缓存命中
+	t.Run("should hit cache on second request", func(t *testing.T) {
+		// 为了确保是缓存命中，我们可以在数据库中创建一个视频，但缓存不更新
+		// 如果返回的是空列表，说明读的是旧缓存
+		db.Create(&types.Video{UserID: testUser.ID, Title: "临时视频", FilePath: "p", FileName: "f", FileSize: 1})
+
+		req := httptest.NewRequest(http.MethodGet, "/videos", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		rr := httptest.NewRecorder()
+		router.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+		var response []*types.Video
+		json.Unmarshal(rr.Body.Bytes(), &response)
+		assert.Equal(t, 0, len(response), "第二次请求应命中缓存，返回空列表")
+
+		// 清理临时视频
+		db.Exec("DELETE FROM videos WHERE title = '临时视频'")
+	})
+
+	// 3. 上传一个新视频，缓存应该被清除
+	t.Run("should invalidate cache after uploading a video", func(t *testing.T) {
+		// 先确保缓存存在
+		redisClient.Set(ctx, userVideosCacheKey, "old_cache_data", 10*time.Minute)
+
+		// 模拟上传
+		body := &bytes.Buffer{}
+		writer := multipart.NewWriter(body)
+		writer.WriteField("title", "新上传的视频")
+		part, _ := writer.CreateFormFile("video", "new.mp4")
+		part.Write([]byte("new video"))
+		writer.Close()
+
+		req := httptest.NewRequest(http.MethodPost, "/videos", body)
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+		req.Header.Set("Authorization", "Bearer "+token)
+		rr := httptest.NewRecorder()
+		router.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusCreated, rr.Code)
+
+		// 验证缓存已被清除
+		exists, err := redisClient.Exists(ctx, userVideosCacheKey).Result()
+		assert.NoError(t, err)
+		assert.Equal(t, int64(0), exists, "上传视频后，用户视频列表缓存应被清除")
+
+		// 再次请求列表，应该能获取到新视频
+		req = httptest.NewRequest(http.MethodGet, "/videos", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		rr = httptest.NewRecorder()
+		router.ServeHTTP(rr, req)
+
+		var response []*types.Video
+		json.Unmarshal(rr.Body.Bytes(), &response)
+		assert.Equal(t, 1, len(response))
+		assert.Equal(t, "新上传的视频", response[0].Title)
+	})
+
+	// 4. 删除视频，相关缓存应该被清除
+	t.Run("should invalidate cache after deleting a video", func(t *testing.T) {
+		// 获取刚上传的视频
+		var video types.Video
+		db.First(&video, "title = ?", "新上传的视频")
+		videoCacheKey := "video:" + strconv.Itoa(video.ID)
+
+		// 手动设置缓存以供测试
+		redisClient.Set(ctx, userVideosCacheKey, "some_data", 10*time.Minute)
+		redisClient.Set(ctx, videoCacheKey, "some_data", 10*time.Minute)
+
+		// 发起删除请求
+		req := httptest.NewRequest(http.MethodDelete, "/videos/"+strconv.Itoa(video.ID), nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		rr := httptest.NewRecorder()
+		router.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+
+		// 验证用户列表缓存和单个视频缓存都已被清除
+		userCacheExists, _ := redisClient.Exists(ctx, userVideosCacheKey).Result()
+		assert.Equal(t, int64(0), userCacheExists, "删除视频后，用户视频列表缓存应被清除")
+
+		videoCacheExists, _ := redisClient.Exists(ctx, videoCacheKey).Result()
+		assert.Equal(t, int64(0), videoCacheExists, "删除视频后，单个视频缓存应被清除")
+	})
+}

@@ -19,6 +19,10 @@ type Config struct {
 	JWTExpiration string
 	UploadDir     string
 	MaxUploadSize int64
+
+	RedisAddress  string
+	RedisPassword string
+	RedisDB       int
 }
 
 var Envs = initConfig()
@@ -49,6 +53,10 @@ func initConfig() Config {
 		JWTExpiration: getEnv("JWT_EXPIRATION", "72h"),
 		UploadDir:     getEnv("UPLOAD_DIR", "./uploads"),
 		MaxUploadSize: getEnvAsInt64("MAX_UPLOAD_SIZE", 524288000),
+
+		RedisAddress:  fmt.Sprintf("%s:%s", getEnv("REDIS_HOST", "localhost"), getEnv("REDIS_PORT", "6379")),
+		RedisPassword: getEnv("REDIS_PASSWORD", ""),
+		RedisDB:       int(getEnvAsInt64("REDIS_DB", 0)),
 	}
 }
 

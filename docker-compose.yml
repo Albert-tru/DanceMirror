@@ -20,6 +20,8 @@ services:
       - JWT_SECRET=your-secret-key-change-in-production
       - JWT_EXPIRATION=3600
       - UPLOAD_DIR=/app/uploads
+      - REDIS_HOST=redis  # <--- 新增这一行
+      - REDIS_PORT=6379   # <--- 新增这一行
     volumes:
       # 挂载 uploads 目录到宿主机（持久化上传文件）
       - ./uploads:/app/uploads
@@ -27,6 +29,8 @@ services:
       - ./static:/app/static
     depends_on:
       db:
+        condition: service_healthy
+      redis:          # <--- 1. 新增依赖 Redis 服务
         condition: service_healthy
     restart: unless-stopped
     networks: # <--- 2. 新增这一整个部分
@@ -57,10 +61,25 @@ services:
     networks:
       - dancemirror-network
 
+  # ⭐ 新增：Redis 服务
+  redis:
+    image: redis:7-alpine
+    container_name: dancemirror-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
 networks:
   dancemirror-network:
     driver: bridge
 
 volumes:
   db-data:
+    driver: local
+  redis-data:
     driver: local
