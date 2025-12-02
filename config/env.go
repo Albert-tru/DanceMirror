@@ -23,6 +23,16 @@ type Config struct {
 	RedisAddress  string
 	RedisPassword string
 	RedisDB       int
+
+	//存储
+	StorageDriver   string // "local" 或 "minio"
+	MinIOEndpoint   string // e.g., "play.min.io:9000"
+	MinIOAccessKey  string //用来访问 MinIO 的 Access Key
+	MinIOSecretKey  string //用来访问 MinIO 的 Secret Key
+	MinIOBucket     string //存储桶名称
+	MinIOUseSSL     bool   // 是否使用 SSL 连接 MinIO
+	MinIORegion     string // MinIO 区域
+	MinIOPresignMin int64  // 预签名 URL 有效期（分钟）
 }
 
 var Envs = initConfig()
@@ -57,6 +67,16 @@ func initConfig() Config {
 		RedisAddress:  fmt.Sprintf("%s:%s", getEnv("REDIS_HOST", "localhost"), getEnv("REDIS_PORT", "6379")),
 		RedisPassword: getEnv("REDIS_PASSWORD", ""),
 		RedisDB:       int(getEnvAsInt64("REDIS_DB", 0)),
+
+		//存储
+		StorageDriver:   getEnv("STORAGE_DRIVER", "minio"),
+		MinIOEndpoint:   getEnv("MINIO_ENDPOINT", "localhost:9000"),
+		MinIOAccessKey:  getEnv("MINIO_ACCESS_KEY", "minioadmin"),
+		MinIOSecretKey:  getEnv("MINIO_SECRET_KEY", "minioadmin"),
+		MinIOBucket:     getEnv("MINIO_BUCKET", "dancemirror"),
+		MinIOUseSSL:     getEnv("MINIO_USE_SSL", "false") == "true",
+		MinIORegion:     getEnv("MINIO_REGION", "us-east-1"),
+		MinIOPresignMin: getEnvAsInt64("MINIO_PRESIGN_MIN", 15),
 	}
 }
 

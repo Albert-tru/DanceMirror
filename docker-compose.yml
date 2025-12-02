@@ -22,6 +22,12 @@ services:
       - UPLOAD_DIR=/app/uploads
       - REDIS_HOST=redis  # <--- 新增这一行
       - REDIS_PORT=6379   # <--- 新增这一行
+      - STORAGE_DRIVER=minio
+      - MINIO_ENDPOINT=minio:9000  # 注意：在 Docker 内部要用服务名 "minio"
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_BUCKET=dancemirror
+      - MINIO_USE_SSL=false      
     volumes:
       # 挂载 uploads 目录到宿主机（持久化上传文件）
       - ./uploads:/app/uploads
@@ -31,6 +37,8 @@ services:
       db:
         condition: service_healthy
       redis:          # <--- 1. 新增依赖 Redis 服务
+        condition: service_healthy
+      minio:
         condition: service_healthy
     restart: unless-stopped
     networks: # <--- 2. 新增这一整个部分
@@ -73,7 +81,31 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    networks:
+      - dancemirror-network
 
+  #新增minio
+  minio:
+    image: minio/minio
+    container_name: dancemirror-minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_SERVER_URL: http://localhost:9000
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+    restart: unless-stopped
+    networks:
+      - dancemirror-network 
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 networks:
   dancemirror-network:
     driver: bridge
@@ -82,4 +114,6 @@ volumes:
   db-data:
     driver: local
   redis-data:
+    driver: local
+  minio-data:
     driver: local

@@ -1,6 +1,10 @@
 package video
 
+//处理视频相关的HTTP路由和请求
+
 import (
+	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -14,6 +18,7 @@ import (
 	"github.com/Albert-tru/DanceMirror/config"
 	"github.com/Albert-tru/DanceMirror/service/auth"
 	"github.com/Albert-tru/DanceMirror/service/cache"
+	"github.com/Albert-tru/DanceMirror/service/storage"
 	"github.com/Albert-tru/DanceMirror/types"
 	"github.com/Albert-tru/DanceMirror/utils"
 	"github.com/gorilla/mux"
@@ -23,13 +28,15 @@ type Handler struct {
 	store     types.VideoStore
 	userStore types.UserStore
 	cache     *cache.RedisClient
+	storage   storage.VideoStorage
 }
 
-func NewHandler(store types.VideoStore, userStore types.UserStore, cache *cache.RedisClient) *Handler {
+func NewHandler(store types.VideoStore, userStore types.UserStore, cache *cache.RedisClient, storage storage.VideoStorage) *Handler {
 	return &Handler{
 		store:     store,
 		userStore: userStore,
 		cache:     cache,
+		storage:   storage,
 	}
 }
 
@@ -44,8 +51,10 @@ func (h *Handler) RegisterRoutes(router *mux.Router) {
 	router.HandleFunc("/crop-video", auth.WithJWTAuth(h.handleCropVideo, h.userStore)).Methods(http.MethodPost)
 	router.HandleFunc("/crop-available", auth.WithJWTAuth(h.handleCheckCropAvailable, h.userStore)).Methods(http.MethodGet)
 
-	// 静态文件服务 - 提供上传的视频文件访问
-	router.PathPrefix("/uploads/").Handler(http.StripPrefix("/uploads/", http.FileServer(http.Dir(config.Envs.UploadDir))))
+	// 静态文件服务 - 只在本地存储模式下启用
+	if config.Envs.StorageDriver != "minio" {
+		router.PathPrefix("/uploads/").Handler(http.StripPrefix("/uploads/", http.FileServer(http.Dir(config.Envs.UploadDir))))
+	}
 }
 
 func (h *Handler) handleGetVideos(w http.ResponseWriter, r *http.Request) {
@@ -54,6 +63,17 @@ func (h *Handler) handleGetVideos(w http.ResponseWriter, r *http.Request) {
 	// 1. 先尝试从缓存获取视频列表
 	videos, err := h.cache.GetUserVideos(userID)
 	if err == nil {
+		//为缓存中的视频生成预签名URL
+		for i := range videos {
+			// 生成预签名 URL，有效期为 15 分钟
+			signedURL, err := h.storage.GetPresignedURL(videos[i].FilePath, time.Minute*15)
+			if err != nil {
+				log.Printf("警告：为视频 ID %d 生成预签名 URL 失败: %v", videos[i].ID, err)
+				continue
+			}
+			videos[i].FilePath = signedURL
+		}
+
 		// 缓存命中，直接返回
 		log.Printf("✅ 缓存命中 - 用户 %d 的视频列表", userID)
 		utils.WriteJSON(w, http.StatusOK, videos)
@@ -66,6 +86,17 @@ func (h *Handler) handleGetVideos(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, err)
 		return
+	}
+
+	// 为数据库查询到的视频生成预签名URL
+	for i := range videos {
+		// 生成预签名 URL，有效期为 15 分钟
+		signedURL, err := h.storage.GetPresignedURL(videos[i].ObjectKey, time.Minute*15)
+		if err != nil {
+			log.Printf("警告：为视频 ID %d 生成预签名 URL 失败: %v", videos[i].ID, err)
+			continue
+		}
+		videos[i].FilePath = signedURL
 	}
 
 	// 3. 将从数据库查到的结果存入缓存
@@ -115,9 +146,19 @@ func (h *Handler) handleGetVideo(w http.ResponseWriter, r *http.Request) {
 	//尝试从缓存获取视频信息
 	cacheVideo, err := h.cache.GetVideoByID(id)
 	if err == nil {
-		// 权限验证
-		userID := auth.GetUserIDFromContext(r.Context())
+		userID := auth.GetUserIDFromContext(r.Context()) // 权限验证
 		if cacheVideo.UserID == userID {
+
+			//为缓存中的视频生成预签名URL
+			if cacheVideo.ObjectKey != "" {
+				signedURL, err := h.storage.GetPresignedURL(cacheVideo.ObjectKey, time.Minute*15)
+				if err != nil {
+					log.Printf("警告：为视频 ID %d 生成预签名 URL 失败: %v", cacheVideo.ID, err)
+				}
+				cacheVideo.FilePath = signedURL
+			}
+
+			// 缓存命中且权限验证通过
 			log.Printf("✅ 缓存命中 - 视频 ID %d", id)
 			utils.WriteJSON(w, http.StatusOK, cacheVideo)
 			return
@@ -125,6 +166,7 @@ func (h *Handler) handleGetVideo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("⚠️  缓存未命中 - 查询数据库 视频 ID %d (原因: %v)", id, err)
+
 	// 从数据库获取视频信息
 	video, err := h.checkVideoOwnership(w, r, id)
 	if err != nil {
@@ -136,6 +178,16 @@ func (h *Handler) handleGetVideo(w http.ResponseWriter, r *http.Request) {
 			utils.WriteError(w, http.StatusForbidden, err)
 		}
 		return
+	}
+
+	//为数据库查询的视频生成预签名URL
+	if video.ObjectKey != "" {
+		signedURL, err := h.storage.GetPresignedURL(video.ObjectKey, time.Minute*15)
+		if err != nil {
+			log.Printf("警告：为视频 ID %d 生成预签名 URL 失败: %v", video.ID, err)
+		} else {
+			video.FilePath = signedURL
+		}
 	}
 
 	// 将视频信息缓存起来
@@ -199,66 +251,37 @@ func (h *Handler) handleUpload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 生成唯一文件名
-	ext := filepath.Ext(header.Filename)
-	fileName := fmt.Sprintf("%d_%s%s", userID, time.Now().Format("20060102_150405"), ext)
-	tempDir := filepath.Join(config.Envs.UploadDir, "temp")
-	finalDir := config.Envs.UploadDir
-	tempPath := filepath.Join(tempDir, fileName)
-	finalPath := filepath.Join(finalDir, fileName)
+	// 生成对象键（MinIO中的唯一标识）
+	objectKey := fmt.Sprintf("videos/%d/%d_%s", userID, time.Now().UnixNano(), header.Filename)
 
-	// 确保上传目录存在
-	if err := os.MkdirAll(tempDir, os.ModePerm); err != nil {
-		utils.WriteError(w, http.StatusInternalServerError, fmt.Errorf("failed to create temp directory: %v", err))
+	// 读取文件内容到内存
+	buf := new(bytes.Buffer)
+	fileSize, err := io.Copy(buf, file)
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, fmt.Errorf("failed to read file: %v", err))
 		return
 	}
-	if err := os.MkdirAll(finalDir, os.ModePerm); err != nil {
-		utils.WriteError(w, http.StatusInternalServerError, fmt.Errorf("failed to create upload directory: %v", err))
+	// 上传到 MinIO
+	if err := h.storage.Upload(context.Background(), objectKey, bytes.NewReader(buf.Bytes()), fileSize, contentType); err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, fmt.Errorf("failed to upload file to storage: %v", err))
 		return
 	}
 
-	// 使用事务保护：文件保存 + 数据库插入的原子性
-	var video *types.Video
-	uploadErr := func() error {
-		// 步骤 1: 保存文件到临时目录
-		dst, err := os.Create(tempPath)
-		if err != nil {
-			return fmt.Errorf("failed to create temp file: %v", err)
-		}
-		defer dst.Close()
+	// 创建视频记录
+	video := &types.Video{
+		UserID:      userID,
+		Title:       title,
+		Description: description,
+		ObjectKey:   objectKey,
+		FilePath:    "", // MinIO 存储不使用本地文件路径
+		FileName:    header.Filename,
+		FileSize:    fileSize,
+	}
 
-		if _, err := io.Copy(dst, file); err != nil {
-			os.Remove(tempPath) // 清理临时文件
-			return fmt.Errorf("failed to save file: %v", err)
-		}
-
-		// 步骤 2: 创建数据库记录（事务保护）
-		video = &types.Video{
-			UserID:      userID,
-			Title:       title,
-			Description: description,
-			FilePath:    "/uploads/" + fileName, // 存储Web可访问路径
-			FileName:    fileName,
-			FileSize:    header.Size,
-		}
-		if err := h.store.CreateVideo(video); err != nil {
-			os.Remove(tempPath) // 清理临时文件
-			return fmt.Errorf("failed to create video record: %v", err)
-		}
-
-		// 步骤 3: 移动文件到正式目录（原子操作）
-		if err := os.Rename(tempPath, finalPath); err != nil {
-			// 数据库插入成功但文件移动失败，回滚数据库记录
-			h.store.DeleteVideo(video.ID)
-			os.Remove(tempPath) // 清理临时文件
-			return fmt.Errorf("failed to move file to final location: %v", err)
-		}
-
-		return nil
-	}()
-
-	if uploadErr != nil {
-		utils.WriteError(w, http.StatusInternalServerError, uploadErr)
+	if err := h.store.CreateVideo(video); err != nil {
+		// 上传失败，删除已上传的文件
+		h.storage.Delete(context.Background(), objectKey)
+		utils.WriteError(w, http.StatusInternalServerError, fmt.Errorf("failed to create video record: %v", err))
 		return
 	}
 
@@ -296,6 +319,24 @@ func (h *Handler) handleDeleteVideo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 从存储中删除文件（MinIO 或本地）
+	if video.ObjectKey != "" {
+		if err := h.storage.Delete(r.Context(), video.ObjectKey); err != nil {
+			log.Printf("⚠️ 删除存储文件失败 (ObjectKey: %s): %v", video.ObjectKey, err)
+		} else {
+			log.Printf("✅ 成功删除存储文件: %s", video.ObjectKey)
+		}
+	} else if video.FilePath != "" {
+		// 向后兼容：处理旧的本地文件路径
+		filePath := video.FilePath
+		if strings.HasPrefix(filePath, "/uploads/") {
+			filePath = filepath.Join(config.Envs.UploadDir, strings.TrimPrefix(filePath, "/uploads/"))
+		}
+		if err := os.Remove(filePath); err != nil {
+			log.Printf("⚠️ 删除本地文件失败: %v", err)
+		}
+	}
+
 	// 删除数据库记录（软删除）
 	if err := h.store.DeleteVideo(id); err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, fmt.Errorf("failed to delete video record: %v", err))
@@ -315,16 +356,6 @@ func (h *Handler) handleDeleteVideo(w http.ResponseWriter, r *http.Request) {
 		log.Printf("✅ 成功删除视频 ID %d 缓存", id)
 	}
 
-	// 删除物理文件 - 将Web路径转换为文件系统路径
-	filePath := video.FilePath
-	if strings.HasPrefix(filePath, "/uploads/") {
-		// 转换为完整文件系统路径
-		filePath = filepath.Join(config.Envs.UploadDir, strings.TrimPrefix(filePath, "/uploads/"))
-	}
-	if err := os.Remove(filePath); err != nil {
-		// 记录错误但不返回失败（文件可能已被删除或移动）
-		fmt.Printf("warning: failed to delete file %s: %v\n", filePath, err)
-	}
 	utils.WriteJSON(w, http.StatusOK, map[string]string{"message": "video deleted successfully"})
 }
 

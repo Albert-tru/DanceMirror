@@ -52,7 +52,7 @@ func CropVideo(inputPath string, outputPath string, params CropParams) error {
 		"-vf", cropFilter, // 视频裁剪过滤器
 		"-c:a", "copy", // 音频直接复制，不重新编码
 		"-c:v", "libx264", // 视频使用 H.264 编码
-		"-preset", "fast", // 编码速度（fast, medium, slow）
+		"-preset", "ultrafast", // 编码速度（fast, medium, slow）
 		"-crf", "23", // 恒定质量模式，23 是默认值（18-28，越小质量越高）
 		"-movflags", "+faststart", // 优化 MP4 流式播放
 		"-y",       // 覆盖输出文件

@@ -44,9 +44,10 @@ type Video struct {
 	UserID      int            `json:"userId" gorm:"column:userId"` // 添加 gorm tag
 	Title       string         `json:"title" gorm:"not null"`
 	Description string         `json:"description"`
-	FilePath    string         `json:"filePath" gorm:"column:filePath;not null"` // 添加 gorm tag
-	FileName    string         `json:"fileName" gorm:"column:fileName;not null"` // 添加 gorm tag
-	FileSize    int64          `json:"fileSize" gorm:"column:fileSize;not null"` // 添加 gorm tag
+	FilePath    string         `json:"filePath" gorm:"column:filePath;size 255;not null"` // 添加 gorm tag
+	ObjectKey   string         `json:"objectKey" gorm:"column:objectKey;not null"`        // 添加 gorm tag
+	FileName    string         `json:"fileName" gorm:"column:fileName;not null"`          // 添加 gorm tag
+	FileSize    int64          `json:"fileSize" gorm:"column:fileSize;not null"`          // 添加 gorm tag
 	Duration    float64        `json:"duration,omitempty"`
 	Thumbnail   string         `json:"thumbnail,omitempty"`
 	CreatedAt   time.Time      `json:"createdAt" gorm:"column:createdAt;autoCreateTime"`

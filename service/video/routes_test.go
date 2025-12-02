@@ -3,6 +3,7 @@ package video
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -27,8 +28,50 @@ import (
 	"gorm.io/gorm/logger"
 )
 
+// mockVideoStorage 模拟视频存储 VideoStorage 接口
+type mockVideoStorage struct {
+	files map[string][]byte // 模拟存储文件的映射
+}
+
+func newMockVideoStorage() *mockVideoStorage {
+	return &mockVideoStorage{
+		files: make(map[string][]byte),
+	}
+}
+
+// 实现接口需要的 Upload 方法
+func (m *mockVideoStorage) Upload(ctx context.Context, objectKey string, r io.Reader, size int64, contentType string) error {
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return err
+	}
+	m.files[objectKey] = data
+	return nil
+}
+
+// 实现接口需要的 Delete 方法
+func (m *mockVideoStorage) Delete(ctx context.Context, objectKey string) error {
+	delete(m.files, objectKey)
+	return nil
+}
+
+// 实现接口需要的 PresignGet 方法
+func (m *mockVideoStorage) GetPresignedURL(objectKey string, expiry time.Duration) (string, error) {
+
+	if _, ok := m.files[objectKey]; !ok {
+		return "", fmt.Errorf("file not found: %s", objectKey)
+	}
+	return fmt.Sprintf("https://mock-storage.example.com/%s?expires=%d", objectKey, int(expiry.Seconds())), nil
+}
+
+// 可选辅助方法（测试断言用）
+func (m *mockVideoStorage) FileExists(objectKey string) bool {
+	_, ok := m.files[objectKey]
+	return ok
+}
+
 // setupTestHandler 创建测试用的 Handler 和路由
-func setupTestHandler(t *testing.T) (*gorm.DB, *mux.Router, *types.User, string) {
+func setupTestHandler(t *testing.T) (*gorm.DB, *mux.Router, *types.User, string, *mockVideoStorage) {
 	// 连接测试数据库
 	dsn := "root:MySQL666@tcp(127.0.0.1:3306)/dancemirror_test?charset=utf8mb4&parseTime=True&loc=Local"
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
@@ -36,6 +79,27 @@ func setupTestHandler(t *testing.T) (*gorm.DB, *mux.Router, *types.User, string)
 	})
 	if err != nil {
 		t.Fatalf("无法连接到测试数据库: %v", err)
+	}
+
+	// 禁用外键检查，防止删表时出错
+	db.Exec("SET FOREIGN_KEY_CHECKS = 0")
+
+	// 彻底删除旧表
+	if err := db.Migrator().DropTable(&types.Video{}, &types.User{}); err != nil {
+		t.Fatalf("无法删除旧表: %v", err)
+	}
+
+	// 恢复外键检查
+	db.Exec("SET FOREIGN_KEY_CHECKS = 1")
+
+	// 重新创建表
+	if err := db.AutoMigrate(&types.User{}); err != nil {
+		t.Fatalf("无法迁移 User 表: %v", err)
+	}
+
+	//  自动迁移确保 object_key 列存在
+	if err := db.AutoMigrate(&types.Video{}); err != nil {
+		t.Fatalf("AutoMigrate 失败: %v", err)
 	}
 
 	// 清空测试数据
@@ -74,16 +138,19 @@ func setupTestHandler(t *testing.T) (*gorm.DB, *mux.Router, *types.User, string)
 		t.Fatalf("无法清空 Redis 测试数据库: %v", err)
 	}
 
-	// 创建 Store 和 Handler
+	// 创建模拟存储
 	videoStore := NewStore(db)
+	videoStorage := newMockVideoStorage()
+
+	// 创建 Handler
 	userStore := &mockUserStore{db: db}
-	handler := NewHandler(videoStore, userStore, redisClient)
+	handler := NewHandler(videoStore, userStore, redisClient, videoStorage)
 
 	// 创建路由
 	router := mux.NewRouter()
 	handler.RegisterRoutes(router)
 
-	return db, router, testUser, token
+	return db, router, testUser, token, videoStorage
 }
 
 // mockUserStore 模拟 UserStore
@@ -134,9 +201,9 @@ func createTestVideoFile(t *testing.T) (string, int64) {
 	return filePath, fileSize
 }
 
-// TestHandleUpload 测试视频上传
+// 视频上传接口 (POST /videos)
 func TestHandleUpload(t *testing.T) {
-	db, router, testUser, token := setupTestHandler(t)
+	db, router, testUser, token, mockStorage := setupTestHandler(t)
 	defer db.Exec("DELETE FROM videos")
 	defer db.Exec("DELETE FROM users")
 	defer os.RemoveAll(config.Envs.UploadDir)
@@ -167,6 +234,7 @@ func TestHandleUpload(t *testing.T) {
 		req.Header.Set("Authorization", "Bearer "+token)
 
 		rr := httptest.NewRecorder()
+
 		router.ServeHTTP(rr, req)
 
 		// 如果失败，打印详细错误
@@ -185,7 +253,10 @@ func TestHandleUpload(t *testing.T) {
 		assert.Equal(t, "这是一个测试视频", response.Description)
 		assert.Equal(t, testUser.ID, response.UserID)
 		assert.NotZero(t, response.ID)
-		assert.NotEmpty(t, response.FilePath)
+
+		// 验证文件已上传到模拟存储
+		assert.NotEmpty(t, response.ObjectKey, "应该生成 ObjectKey")
+		assert.True(t, mockStorage.FileExists(response.ObjectKey), "文件应存在于模拟存储中")
 	})
 
 	t.Run("should upload video with file field name", func(t *testing.T) {
@@ -320,39 +391,41 @@ func TestHandleUpload(t *testing.T) {
 	})
 }
 
-// TestHandleGetVideos 测试获取视频列表
+// 获取视频列表接口 (GET /videos)
 func TestHandleGetVideos(t *testing.T) {
-	db, router, testUser, token := setupTestHandler(t)
+	db, router, testUser, token, mockStorage := setupTestHandler(t)
 	defer db.Exec("DELETE FROM videos")
 	defer db.Exec("DELETE FROM users")
 
 	t.Run("should get user's videos", func(t *testing.T) {
 		// 创建测试视频
-		videos := []*types.Video{
-			{
-				UserID:      testUser.ID,
-				Title:       "视频 1",
-				Description: "描述 1",
-				FilePath:    "/uploads/video1.mp4",
-				FileName:    "video1.mp4",
-				FileSize:    1000,
-			},
-			{
-				UserID:      testUser.ID,
-				Title:       "视频 2",
-				Description: "描述 2",
-				FilePath:    "/uploads/video2.mp4",
-				FileName:    "video2.mp4",
-				FileSize:    2000,
-			},
+		video1 := &types.Video{
+			UserID:    testUser.ID,
+			Title:     "视频 1",
+			ObjectKey: "videos/1/test1.mp4",
+			FilePath:  "videos/1/test1.mp4",
+			FileName:  "test1.mp4",
+			FileSize:  1000,
+		}
+		video2 := &types.Video{
+			UserID:    testUser.ID,
+			Title:     "视频 2",
+			ObjectKey: "videos/1/test2.mp4",
+			FilePath:  "videos/1/test2.mp4",
+			FileName:  "test2.mp4",
+			FileSize:  2000,
 		}
 
-		for _, v := range videos {
-			db.Create(v)
-		}
+		db.Create(video1)
+		db.Create(video2)
+
+		// 模拟文件存在于存储中
+		mockStorage.files[video1.ObjectKey] = []byte("content1")
+		mockStorage.files[video2.ObjectKey] = []byte("content2")
 
 		t.Cleanup(func() {
-			db.Delete(&videos)
+			db.Delete(video1)
+			db.Delete(video2)
 		})
 
 		req := httptest.NewRequest(http.MethodGet, "/videos", nil)
@@ -370,6 +443,12 @@ func TestHandleGetVideos(t *testing.T) {
 		var response []*types.Video
 		json.Unmarshal(rr.Body.Bytes(), &response)
 		assert.Equal(t, 2, len(response))
+
+		//验证返回的预签名 URL
+		for _, v := range response {
+			assert.Contains(t, v.FilePath, "https://mock-storage.example.com/")
+			assert.Contains(t, v.FilePath, "expires=")
+		}
 	})
 
 	t.Run("should return empty list for user with no videos", func(t *testing.T) {
@@ -419,7 +498,7 @@ func TestHandleGetVideos(t *testing.T) {
 
 // TestVideoCache 测试视频相关的缓存逻辑
 func TestVideoCache(t *testing.T) {
-	db, router, testUser, token := setupTestHandler(t)
+	db, router, testUser, token, _ := setupTestHandler(t)
 	defer db.Exec("DELETE FROM videos")
 	defer db.Exec("DELETE FROM users")
 
