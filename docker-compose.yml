@@ -28,6 +28,7 @@ services:
       - MINIO_SECRET_KEY=minioadmin
       - MINIO_BUCKET=dancemirror
       - MINIO_USE_SSL=false      
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/  # <--- 新增这一行
     volumes:
       # 挂载 uploads 目录到宿主机（持久化上传文件）
       - ./uploads:/app/uploads
@@ -39,6 +40,8 @@ services:
       redis:          # <--- 1. 新增依赖 Redis 服务
         condition: service_healthy
       minio:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     restart: unless-stopped
     networks: # <--- 2. 新增这一整个部分
@@ -106,6 +109,25 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: dancemirror-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    restart: unless-stopped
+    networks:
+      - dancemirror-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      
 networks:
   dancemirror-network:
     driver: bridge

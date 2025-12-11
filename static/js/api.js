@@ -8,7 +8,7 @@ const DanceMirrorAPI = (function() {
 
     // 配置
     const config = {
-        apiBase: '/api/v1',
+        apiBase: '/api/v1', // ✅ 基础路径
         tokenKey: 'token',
         userKey: 'user'
     };
@@ -60,14 +60,11 @@ const DanceMirrorAPI = (function() {
                 
                 // 处理 403 Forbidden 错误（权限被拒绝）
                 if (res.status === 403) {
-                    // 可能是 token 过期或用户不存在，清除本地数据
                     clearToken();
-                    // 如果错误信息包含 "permission denied"，说明需要重新登录
                     if (errText.includes('permission denied')) {
-                        // 显示友好提示并重新加载页面（会跳转到登录界面）
                         alert('登录已过期，请重新登录');
                         window.location.reload();
-                        return; // 防止继续执行
+                        return;
                     }
                 }
                 
@@ -114,12 +111,26 @@ const DanceMirrorAPI = (function() {
             return await request('/videos', { method: 'GET' });
         },
 
-        // 获取单个视频
-        getVideo: async function(id) {
-            return await request(`/videos/${id}`, { method: 'GET' });
+        // ✅ 修复：使用 config.apiBase
+        getVideo: async (videoId) => {
+            return await request(`/videos/${videoId}`, { method: 'GET' });
         },
 
-        // 上传视频（支持多种签名）
+        // ✅ 修复：使用 config.apiBase
+        cropVideoCloud: async (videoId, params) => {
+            return await request(`/videos/${videoId}/crop`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(params)
+            });
+        },
+        
+        // 兼容旧名称
+        cropVideo: async (videoId, params) => {
+            return api.cropVideoCloud(videoId, params);
+        },
+
+        // 上传视频
         uploadVideo: async function(arg1, arg2, arg3, arg4) {
             let file, opts = {}, onProgress;
             if (arg1 && typeof arg1 === 'object' && arg1.file) {
@@ -137,7 +148,7 @@ const DanceMirrorAPI = (function() {
             }
             if (!file) throw new Error('未提供文件');
             const form = new FormData();
-            form.append('file', file, file.name || ('upload_' + Date.now() + '.webm'));
+            form.append('video', file, file.name || ('upload_' + Date.now() + '.mp4')); // 统一字段名为 video
             if (opts.title) form.append('title', opts.title);
             if (opts.description) form.append('description', opts.description);
 
@@ -165,6 +176,7 @@ const DanceMirrorAPI = (function() {
                     xhr.addEventListener('error', () => {
                         reject(new Error('上传失败: 网络错误'));
                     });
+                    // ✅ 修复：使用 config.apiBase
                     xhr.open('POST', `${config.apiBase}/videos`);
                     const token = getToken();
                     if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
@@ -188,28 +200,14 @@ const DanceMirrorAPI = (function() {
             window.open(path, '_blank');
         },
 
-        // 检查是否已登录
-        isLoggedIn: function() {
-            return !!getToken();
-        },
-
-        // 获取当前用户
+        isLoggedIn: function() { return !!getToken(); },
         getCurrentUser: getCurrentUser,
-
-        // 获取 token
         getToken: getToken,
-
-        // 设置 token
         setToken: setToken,
-
-        // 清除 token
         clearToken: clearToken,
-
-        // 设置当前用户
         setCurrentUser: setCurrentUser
     };
 
-    // 挂载到全局
     window.DanceMirrorAPI = api;
     return api;
 })();

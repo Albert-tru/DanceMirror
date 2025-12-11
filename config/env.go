@@ -33,6 +33,9 @@ type Config struct {
 	MinIOUseSSL     bool   // 是否使用 SSL 连接 MinIO
 	MinIORegion     string // MinIO 区域
 	MinIOPresignMin int64  // 预签名 URL 有效期（分钟）
+
+	//消息队列
+	RabbitMQURL string // RabbitMQ 连接 URL
 }
 
 var Envs = initConfig()
@@ -77,6 +80,9 @@ func initConfig() Config {
 		MinIOUseSSL:     getEnv("MINIO_USE_SSL", "false") == "true",
 		MinIORegion:     getEnv("MINIO_REGION", "us-east-1"),
 		MinIOPresignMin: getEnvAsInt64("MINIO_PRESIGN_MIN", 15),
+
+		//消息队列
+		RabbitMQURL: getEnv("RABBITMQ_URL", "amqp://guest:guest@dancemirror-rabbitmq:5672/"),
 	}
 }
 

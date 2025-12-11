@@ -53,6 +53,11 @@ type Video struct {
 	CreatedAt   time.Time      `json:"createdAt" gorm:"column:createdAt;autoCreateTime"`
 	UpdatedAt   time.Time      `json:"updatedAt" gorm:"column:updatedAt;autoUpdateTime"`
 	DeletedAt   gorm.DeletedAt `json:"-" gorm:"column:deletedAt;index"`
+
+	//任务状态
+	Status      string `json:"status" gorm:"column:status;typen:varchar(32);default:'pending'"`
+	StoragePath string `json:"storagePath" gorm:"column:storagePath"`
+	OutputPath  string `json:"outputPath"  gorm:"column:outputPath"` // processing, completed, failed
 }
 
 // UploadVideoPayload 视频上传请求

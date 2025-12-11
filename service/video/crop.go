@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings" // ✅ 新增引用
 	"time"
 
 	"github.com/Albert-tru/DanceMirror/config"
@@ -31,9 +32,13 @@ func CropVideo(inputPath string, outputPath string, params CropParams) error {
 		return fmt.Errorf("invalid crop position: x=%d, y=%d", params.X, params.Y)
 	}
 
-	// 确保输入文件存在
-	if _, err := os.Stat(inputPath); os.IsNotExist(err) {
-		return fmt.Errorf("input file does not exist: %s", inputPath)
+	// ✅ 修复：如果是 URL (MinIO)，跳过本地文件检查
+	// FFmpeg 支持 HTTP/HTTPS 协议，不需要 os.Stat 检查
+	if !strings.HasPrefix(inputPath, "http://") && !strings.HasPrefix(inputPath, "https://") {
+		// 确保输入文件存在 (仅本地文件模式下检查)
+		if _, err := os.Stat(inputPath); os.IsNotExist(err) {
+			return fmt.Errorf("input file does not exist: %s", inputPath)
+		}
 	}
 
 	// 确保输出目录存在
@@ -48,7 +53,7 @@ func CropVideo(inputPath string, outputPath string, params CropParams) error {
 
 	// FFmpeg 命令参数
 	args := []string{
-		"-i", inputPath, // 输入文件
+		"-i", inputPath, // 输入文件 (可以是本地路径，也可以是 URL)
 		"-vf", cropFilter, // 视频裁剪过滤器
 		"-c:a", "copy", // 音频直接复制，不重新编码
 		"-c:v", "libx264", // 视频使用 H.264 编码

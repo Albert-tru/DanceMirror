@@ -282,14 +282,17 @@
             background: #000;
             border-radius: var(--radius-md);
             overflow: hidden;
-            min-height: 300px;
-            max-height: 70vh; /* 限制最大高度，防止超出视口 */
+    min-height: unset !important;
+    max-height: unset !important;
+    height: auto !important;
+            width: 100%;
         }
         .video-player-wrapper video {
             width: 100%;
              height: auto; /* ✅ 改为自动高度 */
             display: block;
             object-fit: contain;
+             max-width: 100%;
         }
         video.mirrored {
             transform: scaleX(-1);
@@ -440,6 +443,80 @@
             top: 80px;
             scroll-behavior: smooth;
         }
+
+/* ===== 云端视频选择弹窗 ===== */
+.cloud-select-modal {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--bg-elevated);
+    padding: 24px;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    z-index: 10000;
+    width: 90%;
+    max-width: 600px;
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.cloud-select-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.cloud-select-header h3 {
+    margin: 0;
+    font-size: 18px;
+}
+
+.cloud-select-close {
+    font-size: 24px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    background: none;
+    border: none;
+    padding: 0;
+}
+
+.cloud-select-close:hover {
+    color: var(--text-primary);
+}
+
+.cloud-video-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.cloud-video-item {
+    padding: 12px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.cloud-video-item:hover {
+    background: var(--bg-hover);
+    border-color: var(--primary);
+}
+
+.cloud-video-item h4 {
+    margin: 0 0 4px 0;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.cloud-video-item p {
+    margin: 0;
+    font-size: 12px;
+    color: var(--text-secondary);
+}        
 
 /* ✅ 新增：快速操作卡片容器单独定位 */
 .quick-actions {
@@ -1064,6 +1141,14 @@
                         <button class="btn btn-block" id="uploadLocalBtn">选择文件</button>
                     </div>
 
+                    <div class="action-card" id="actionUpload">
+                        <div class="card-icon"></div>
+                        <h4>或选择视频</h4>
+                        <button class="btn btn-block" id="selectCloudBtn">☁️ 从云端选择</button>
+                        <input id="localVideoInput" type="file" accept="video/*" class="hidden"/>
+                        <button class="btn btn-block" id="uploadLocalBtn">💾 从本地上传</button>
+                    </div>
+
                     <div class="action-card card-disabled" id="actionCompare">
                         <div class="card-icon"></div>
                         <h4>3. 开始对比</h4>
@@ -1082,6 +1167,20 @@
         </div>
     </div>
     <!-- ✅ END: 新的三栏布局 HTML 结构 -->
+
+    <!-- ✅ 新增：云端视频选择弹窗 -->
+<div id="cloudSelectModal" class="cloud-select-modal hidden" aria-hidden="true">
+    <div class="cloud-select-header">
+        <h3>☁️ 选择云端视频</h3>
+        <button class="cloud-select-close" id="cloudSelectClose">✖</button>
+    </div>
+    <div class="cloud-video-list" id="cloudVideoList">
+        <div class="loading-state">
+            <div class="spinner"></div>
+            <p>加载中...</p>
+        </div>
+    </div>
+</div>
 
     <!-- 裁剪面板（录制或本地视频加载后可打开） -->
     <div id="cropPanel" class="crop-panel hidden" aria-hidden="true">
@@ -1135,6 +1234,36 @@
         // utils
         function showMessage(text, type='info', timeout=3000) { Utils.showMessage('message', text, type, timeout); }
 
+                // ⭐ 修复：如果 api.js 没更新，在这里自动补全缺失的云端裁剪方法
+        if (typeof DanceMirrorAPI !== 'undefined') {
+            if (!DanceMirrorAPI.cropVideoCloud) {
+                DanceMirrorAPI.cropVideoCloud = async (videoId, params) => {
+                    const token = localStorage.getItem('token');
+                    const res = await fetch(`/api/v1/videos/${videoId}/crop`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(params)
+                    });
+                    if (!res.ok) throw new Error(`云端提交失败: ${res.status}`);
+                    return await res.json();
+                };
+            }
+            if (!DanceMirrorAPI.getVideoStatus) {
+                DanceMirrorAPI.getVideoStatus = async (videoId) => {
+                    const token = localStorage.getItem('token');
+                    const res = await fetch(`/api/v1/videos/${videoId}`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (!res.ok) throw new Error('获取状态失败');
+                    return await res.json();
+                };
+            }
+        }
+
+
         window.onload = function() {
             if (!DanceMirrorAPI.isLoggedIn()) {
                 showMessage('请先登录，正在跳转...', 'error', 1500);
@@ -1146,6 +1275,7 @@
             initModeSwitcher();
             initLayoutSwitcher(); // ✅ 新增：初始化布局切换
             initLocalUpload();
+            initCloudSelect();
             initMiscControls();
             initSingleControls(); //初始化单视频控制绑定
             loadVideos();
@@ -1506,21 +1636,32 @@
             originalVideo.load();
             singleVideo.load(); // ✅ 加载单视频模式的视频
 
-    // ✅ 新增：动态调整容器高度以匹配视频比例
-    originalVideo.addEventListener('loadedmetadata', () => {
-        const wrapper = originalVideo.closest('.video-player-wrapper');
-        if (wrapper && originalVideo.videoWidth && originalVideo.videoHeight) {
-            const aspectRatio = originalVideo.videoHeight / originalVideo.videoWidth;
-            wrapper.style.aspectRatio = `${originalVideo.videoWidth} / ${originalVideo.videoHeight}`;
-        }
-    }, { once: true });
+originalVideo.addEventListener('loadedmetadata', () => {
+    const wrapper = originalVideo.closest('.video-player-wrapper');
+    if (wrapper && originalVideo.videoWidth && originalVideo.videoHeight) {
+        wrapper.style.cssText = `
+            aspect-ratio: ${originalVideo.videoWidth} / ${originalVideo.videoHeight} !important;
+            height: auto !important;
+            min-height: unset !important;
+            max-height: unset !important;
+            width: 100%;
+        `;
+    }
+}, { once: true });
 
-    singleVideo.addEventListener('loadedmetadata', () => {
-        const wrapper = singleVideo.closest('.video-player-wrapper');
-        if (wrapper && singleVideo.videoWidth && singleVideo.videoHeight) {
-            wrapper.style.aspectRatio = `${singleVideo.videoWidth} / ${singleVideo.videoHeight}`;
-        }
-    }, { once: true });
+singleVideo.addEventListener('loadedmetadata', () => {
+    const wrapper = singleVideo.closest('.video-player-wrapper');
+    if (wrapper && singleVideo.videoWidth && singleVideo.videoHeight) {
+        wrapper.style.cssText = `
+            aspect-ratio: ${singleVideo.videoWidth} / ${singleVideo.videoHeight} !important;
+            height: auto !important;
+            min-height: unset !important;
+            max-height: unset !important;
+            width: 100%;
+        `;
+    }
+}, { once: true });
+
 
     document.querySelectorAll('.video-item').forEach(i=>i.classList.remove('active'));
     if (itemEl) itemEl.classList.add('active');
@@ -1601,12 +1742,25 @@
                 userVideo.muted = false; 
                 userVideo.load();
 
-                userVideo.addEventListener('loadedmetadata', () => {
-        const wrapper = userVideo.closest('.video-player-wrapper');
-        if (wrapper && userVideo.videoWidth && userVideo.videoHeight) {
-            wrapper.style.aspectRatio = `${userVideo.videoWidth} / ${userVideo.videoHeight}`;
-        }
-    }, { once: true });
+userVideo.addEventListener('loadedmetadata', () => {
+    const wrapper = userVideo.closest('.video-player-wrapper');
+    if (wrapper && userVideo.videoWidth && userVideo.videoHeight) {
+        // ✅ 强制覆盖所有尺寸属性
+        wrapper.style.cssText = `
+            aspect-ratio: ${userVideo.videoWidth} / ${userVideo.videoHeight} !important;
+            height: auto !important;
+            min-height: unset !important;
+            max-height: unset !important;
+            width: 100%;
+        `;
+        
+        console.log(`✅ 右侧容器已调整:
+            视频尺寸: ${userVideo.videoWidth}x${userVideo.videoHeight}
+            容器 aspect-ratio: ${userVideo.videoWidth} / ${userVideo.videoHeight}
+            容器当前高度: ${wrapper.offsetHeight}px
+        `);
+    }
+}, { once: true });
 
                 document.getElementById('downloadRecBtn').disabled = false; 
                 document.getElementById('uploadRecBtn').disabled = false;
@@ -1642,6 +1796,114 @@
                 setTimeout(()=> openCropPanel(), 200);
             });
         }
+
+        // ✅ 新增：初始化云端视频选择
+function initCloudSelect() {
+    const selectBtn = document.getElementById('selectCloudBtn');
+    const modal = document.getElementById('cloudSelectModal');
+    const closeBtn = document.getElementById('cloudSelectClose');
+    const listEl = document.getElementById('cloudVideoList');
+
+    selectBtn.addEventListener('click', async () => {
+        modal.classList.remove('hidden');
+        modal.setAttribute('aria-hidden', 'false');
+        
+        try {
+            listEl.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>加载中...</p></div>';
+            const videos = await DanceMirrorAPI.getVideos();
+            
+            if (videos && videos.length) {
+                listEl.innerHTML = '';
+                videos.forEach(video => {
+                    const item = document.createElement('div');
+                    item.className = 'cloud-video-item';
+                    item.innerHTML = `
+                        <h4>${Utils.escapeHtml(video.title)}</h4>
+                        <p>${Utils.escapeHtml(video.description || '暂无描述')}</p>
+                        <p style="font-size:11px;color:#999;margin-top:4px;">${Utils.formatDate(video.createdAt)}</p>
+                    `;
+                    item.onclick = () => selectCloudVideo(video);
+                    listEl.appendChild(item);
+                });
+            } else {
+                listEl.innerHTML = '<p style="text-align:center;color:#666;padding:20px;">暂无视频</p>';
+            }
+        } catch (err) {
+            console.error(err);
+            listEl.innerHTML = '<p style="text-align:center;color:#f44;padding:20px;">加载失败</p>';
+        }
+    });
+
+    closeBtn.addEventListener('click', () => {
+        modal.classList.add('hidden');
+        modal.setAttribute('aria-hidden', 'true');
+    });
+}
+
+// ✅ 新增：选择云端视频
+function selectCloudVideo(video) {
+    let videoPath = video.filePath || '';
+    if (!videoPath) {
+        showMessage('视频路径缺失', 'error');
+        return;
+    }
+    
+    if (!/^https?:\/\//.test(videoPath)) {
+        videoPath = videoPath.replace(/^\/?app\//, '/');
+        videoPath = videoPath.replace(/^\/?uploads\//, '/uploads/');
+        videoPath = videoPath.replace(/^\/?static\//, '/static/');
+        if (!videoPath.startsWith('/')) {
+            videoPath = '/' + videoPath.replace(/^\/+/, '');
+        }
+    }
+
+    userVideo.srcObject = null;
+    userVideo.src = videoPath;
+    userVideo.muted = false;
+    userVideo.load();
+
+    userVideo.addEventListener('loadedmetadata', () => {
+        const wrapper = userVideo.closest('.video-player-wrapper');
+        if (wrapper && userVideo.videoWidth && userVideo.videoHeight) {
+            wrapper.style.cssText = `
+                aspect-ratio: ${userVideo.videoWidth} / ${userVideo.videoHeight} !important;
+                height: auto !important;
+                min-height: unset !important;
+                max-height: unset !important;
+                width: 100%;
+            `;
+        }
+    }, { once: true });
+
+    document.getElementById('downloadRecBtn').disabled = false;
+    document.getElementById('uploadRecBtn').disabled = false;
+    document.getElementById('actionCompare').classList.remove('card-disabled');
+    document.getElementById('actionExport').classList.remove('card-disabled');
+
+    const actionRecord = document.getElementById('actionRecord');
+    actionRecord.classList.remove('card-primary');
+    const recordStatus = actionRecord.querySelector('.card-status');
+    if (!recordStatus) {
+        const statusDiv = document.createElement('div');
+        statusDiv.className = 'card-status';
+        statusDiv.textContent = '已完成 ✓';
+        actionRecord.appendChild(statusDiv);
+    } else {
+        recordStatus.textContent = '已完成 ✓';
+    }
+
+    const actionCompare = document.getElementById('actionCompare');
+    actionCompare.classList.add('card-primary');
+    const compareStatus = actionCompare.querySelector('.card-status');
+    if (compareStatus) {
+        compareStatus.textContent = '可以开始 →';
+    }
+
+    document.getElementById('cloudSelectModal').classList.add('hidden');
+    document.getElementById('cloudSelectModal').setAttribute('aria-hidden', 'true');
+
+    showMessage(`✅ 已选择云端视频: ${video.title}`, 'success', 2000);
+}
 
         // ---------- misc controls ----------
         function initMiscControls(){
@@ -1769,7 +2031,6 @@
             }
         }
 
-        // ---------- cropper (canvas-based, exports PNG frame) ----------
 // ---------- cropper (canvas-based, exports PNG frame) ----------
 class VideoCropper {
     constructor(videoEl, canvasEl){
@@ -1778,14 +2039,24 @@ class VideoCropper {
         this.ctx = canvasEl.getContext('2d');
         this.crop = null;
         this.raf = null;
+        
+        // 交互状态
+        this.isDragging = false;
+        this.dragStart = {x:0, y:0};
+        this.initialCrop = null;
+        this.action = 'none'; // 'move' (移动) 或 'create' (新建)
+
+        // 绑定 this 防止丢失
+        this._onMouseDown = this.onMouseDown.bind(this);
+        this._onMouseMove = this.onMouseMove.bind(this);
+        this._onMouseUp = this.onMouseUp.bind(this);
     }
+
     init(){
         // ✅ 等待视频元数据加载完成
         if (this.video.readyState >= 1) {
-            // 视频已经有元数据
             this.resizeCanvas();
         } else {
-            // 等待元数据加载
             this.video.addEventListener('loadedmetadata', () => {
                 this.resizeCanvas();
             }, { once: true });
@@ -1793,10 +2064,29 @@ class VideoCropper {
         
         window.addEventListener('resize', ()=> this.resizeCanvas());
         this.initRatioButtons();
+        
+        // ✅ 绑定鼠标/触摸事件
+        this.canvas.addEventListener('mousedown', this._onMouseDown);
+        window.addEventListener('mousemove', this._onMouseMove);
+        window.addEventListener('mouseup', this._onMouseUp);
+        
+        // 简单的触摸支持
+        this.canvas.addEventListener('touchstart', (e)=> {
+            e.preventDefault();
+            const t = e.touches[0];
+            this.onMouseDown({ clientX: t.clientX, clientY: t.clientY });
+        }, {passive: false});
+        window.addEventListener('touchmove', (e)=> {
+            if(this.isDragging) e.preventDefault();
+            const t = e.touches[0];
+            this.onMouseMove({ clientX: t.clientX, clientY: t.clientY });
+        }, {passive: false});
+        window.addEventListener('touchend', ()=> this.onMouseUp());
+
         this.drawLoop();
     }
+
     resizeCanvas(){
-        // ✅ 使用视频的原始宽高比
         const videoWidth = this.video.videoWidth || 1280;
         const videoHeight = this.video.videoHeight || 720;
         const videoAspect = videoWidth / videoHeight;
@@ -1804,19 +2094,19 @@ class VideoCropper {
         const rect = this.canvas.getBoundingClientRect();
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
         
-        // ✅ 根据视频原始比例设置 canvas 尺寸
         this.canvas.width = Math.max(320, Math.round(rect.width * dpr));
         this.canvas.height = Math.round(this.canvas.width / videoAspect);
         
-        // ✅ 确保 canvas 不会太高（限制最大高度）
         const maxHeight = Math.round(rect.height * dpr);
         if (this.canvas.height > maxHeight) {
             this.canvas.height = maxHeight;
             this.canvas.width = Math.round(this.canvas.height * videoAspect);
         }
         
+        // 如果没有裁剪框，默认给一个 16:9
         if (!this.crop) this.setRatio('16:9');
     }
+
     initRatioButtons(){
         document.querySelectorAll('.ratio-btn').forEach(b => b.addEventListener('click', (e)=>{
             document.querySelectorAll('.ratio-btn').forEach(x=>x.classList.remove('active'));
@@ -1824,28 +2114,137 @@ class VideoCropper {
             this.setRatio(b.dataset.ratio);
         }));
     }
+
     setRatio(r){
-        const [rw, rh] = r==='custom' ? [16,9] : r.split(':').map(Number);
+        // 如果是自定义，不重置框，只激活按钮状态
+        if (r === 'custom') return;
+
+        const [rw, rh] = r.split(':').map(Number);
         const w = this.canvas.width, h = this.canvas.height;
-        const scale = Math.min(w / rw, h / rh);
+        // 计算最大适配尺寸
+        const scale = Math.min(w / rw, h / rh) * 0.8; // 0.8 让它默认稍微小一点，留出边距
         const cw = Math.round(rw * scale), ch = Math.round(rh * scale);
         this.crop = { x: Math.round((w - cw)/2), y: Math.round((h - ch)/2), w: cw, h: ch };
     }
+
+    // --- 交互逻辑 ---
+
+    getMousePos(e) {
+        const rect = this.canvas.getBoundingClientRect();
+        return {
+            x: (e.clientX - rect.left) * (this.canvas.width / rect.width),
+            y: (e.clientY - rect.top) * (this.canvas.height / rect.height)
+        };
+    }
+
+    onMouseDown(e) {
+        const pos = this.getMousePos(e);
+        this.isDragging = true;
+        this.dragStart = pos;
+
+        // 判断点击位置：是在现有框内（移动），还是框外（新建）
+        if (this.crop && 
+            pos.x >= this.crop.x && pos.x <= this.crop.x + this.crop.w &&
+            pos.y >= this.crop.y && pos.y <= this.crop.y + this.crop.h) {
+            this.action = 'move';
+            this.initialCrop = { ...this.crop };
+        } else {
+            this.action = 'create';
+            this.crop = { x: pos.x, y: pos.y, w: 0, h: 0 };
+            // 切换到自定义模式
+            document.querySelectorAll('.ratio-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector('.ratio-btn[data-ratio="custom"]')?.classList.add('active');
+        }
+    }
+
+    onMouseMove(e) {
+        if (!this.isDragging) return;
+        const pos = this.getMousePos(e);
+
+        if (this.action === 'move') {
+            const dx = pos.x - this.dragStart.x;
+            const dy = pos.y - this.dragStart.y;
+            
+            let newX = this.initialCrop.x + dx;
+            let newY = this.initialCrop.y + dy;
+
+            // 边界限制
+            newX = Math.max(0, Math.min(newX, this.canvas.width - this.initialCrop.w));
+            newY = Math.max(0, Math.min(newY, this.canvas.height - this.initialCrop.h));
+
+            this.crop.x = newX;
+            this.crop.y = newY;
+        } else if (this.action === 'create') {
+            this.crop.w = pos.x - this.dragStart.x;
+            this.crop.h = pos.y - this.dragStart.y;
+        }
+    }
+
+    onMouseUp(e) {
+        if (!this.isDragging) return;
+        this.isDragging = false;
+        
+        // 处理负宽高（从右下往左上拉的情况）
+        if (this.crop.w < 0) {
+            this.crop.x += this.crop.w;
+            this.crop.w = Math.abs(this.crop.w);
+        }
+        if (this.crop.h < 0) {
+            this.crop.y += this.crop.h;
+            this.crop.h = Math.abs(this.crop.h);
+        }
+        
+        // 防止框太小
+        if (this.crop.w < 10 || this.crop.h < 10) {
+            if (this.action === 'create') this.setRatio('16:9'); // 如果画得太小，恢复默认
+        }
+    }
+
     drawLoop(){
         if (this.video && this.video.readyState >= 2) {
             this.ctx.clearRect(0,0,this.canvas.width,this.canvas.height);
-            // ✅ 保持视频原始比例绘制
             this.ctx.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
+            
+            // 绘制遮罩层（让非裁剪区域变暗）
+            this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
             if (this.crop) {
+                // 清除裁剪区域的遮罩，显示原图
+                // 这里用个小技巧：重绘裁剪区域的图像
+                this.ctx.drawImage(this.video, 
+                    this.crop.x * (this.video.videoWidth / this.canvas.width), 
+                    this.crop.y * (this.video.videoHeight / this.canvas.height),
+                    this.crop.w * (this.video.videoWidth / this.canvas.width),
+                    this.crop.h * (this.video.videoHeight / this.canvas.height),
+                    this.crop.x, this.crop.y, this.crop.w, this.crop.h
+                );
+
+                // 绘制边框
                 this.ctx.strokeStyle = '#00bfff'; 
-                this.ctx.lineWidth = Math.max(2, this.canvas.width * 0.002);
+                this.ctx.lineWidth = 2;
                 this.ctx.strokeRect(this.crop.x, this.crop.y, this.crop.w, this.crop.h);
-                this.ctx.fillStyle = 'rgba(0,191,255,0.06)';
-                this.ctx.fillRect(this.crop.x, this.crop.y, this.crop.w, this.crop.h);
+                
+                // 绘制九宫格辅助线
+                this.ctx.beginPath();
+                this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                this.ctx.lineWidth = 1;
+                // 竖线
+                this.ctx.moveTo(this.crop.x + this.crop.w/3, this.crop.y);
+                this.ctx.lineTo(this.crop.x + this.crop.w/3, this.crop.y + this.crop.h);
+                this.ctx.moveTo(this.crop.x + 2*this.crop.w/3, this.crop.y);
+                this.ctx.lineTo(this.crop.x + 2*this.crop.w/3, this.crop.y + this.crop.h);
+                // 横线
+                this.ctx.moveTo(this.crop.x, this.crop.y + this.crop.h/3);
+                this.ctx.lineTo(this.crop.x + this.crop.w, this.crop.y + this.crop.h/3);
+                this.ctx.moveTo(this.crop.x, this.crop.y + 2*this.crop.h/3);
+                this.ctx.lineTo(this.crop.x + this.crop.w, this.crop.y + 2*this.crop.h/3);
+                this.ctx.stroke();
             }
         }
         this.raf = requestAnimationFrame(()=> this.drawLoop());
     }
+
     async exportCroppedImageBlob(){
         if (!this.crop) return null;
         const tmp = document.createElement('canvas');
@@ -1853,11 +2252,16 @@ class VideoCropper {
         tmp.getContext('2d').drawImage(this.canvas, this.crop.x, this.crop.y, this.crop.w, this.crop.h, 0, 0, this.crop.w, this.crop.h);
         return new Promise(resolve => tmp.toBlob(resolve, 'image/png'));
     }
+
     destroy(){ 
         cancelAnimationFrame(this.raf); 
         window.removeEventListener('resize', ()=>{}); 
+        this.canvas.removeEventListener('mousedown', this._onMouseDown);
+        window.removeEventListener('mousemove', this._onMouseMove);
+        window.removeEventListener('mouseup', this._onMouseUp);
     }
 }
+// ...existing code...
 
         function openCropPanel(){
             // require a video source (recorded or loaded) before opening the crop panel
@@ -1977,168 +2381,263 @@ async function cropAndTranscode(inputBlob, cropParams, opts={}){
   return blob;
 }
   
-    // ✅ 完整的 applyCrop 处理逻辑（兼容当前版本的 UI）
-    (function wireApplyCrop(){
-      const applyBtn = document.getElementById('applyCropBtn');
-      if(!applyBtn) return;
-      applyBtn.type='button';
-      applyBtn.addEventListener('click', async ()=>{
+// ✅ 新的智能裁剪逻辑：云端优先 -> 本地降级
+(function wireApplyCrop(){
+    const applyBtn = document.getElementById('applyCropBtn');
+    if(!applyBtn) return;
+    
+    applyBtn.type='button';
+    applyBtn.addEventListener('click', async ()=>{
         const originalText = applyBtn.textContent;
         applyBtn.disabled = true;
-        applyBtn.textContent = '处理中...';
-        
-        try{
-          // 确保 cropper 已初始化
-          if(!window.activeCropper){
-            if(window.cropCanvas){
-              try{ userVideo.pause(); userVideo.currentTime = Math.min(userVideo.duration||0,0); userVideo.play().catch(()=>{}); }catch(e){}
-              activeCropper = new VideoCropper(userVideo, cropCanvas); 
-              activeCropper.init(); 
-              await new Promise(r=>setTimeout(r,150));
-            }else if(window.userVideo && userVideo.readyState>=2){
-              const off=document.createElement('canvas'); 
-              const w=userVideo.videoWidth||640, h=userVideo.videoHeight||360; 
-              off.width=w; off.height=h; 
-              const ctx=off.getContext('2d'); 
-              try{ctx.drawImage(userVideo,0,0,w,h);}catch(e){}
-              activeCropper={canvas:off, crop:{x:0,y:0,w:w,h:h}};
+
+        let videoId = (window.selectedVideo?.id) || window.currentVideoId || null;
+        let videoInfo = null;
+
+        // 1. 获取裁剪参数 (通用步骤)
+        if(!activeCropper || !activeCropper.crop) {
+            showMessage('请先选择裁剪区域', 'error');
+            applyBtn.disabled = false;
+            return;
+        }
+
+        // 计算真实坐标
+        const c = activeCropper.crop;
+        const canvas = activeCropper.canvas;
+        const video = activeCropper.video;
+        const videoWidth = video.videoWidth || 1920;
+        const videoHeight = video.videoHeight || 1080;
+        const scaleX = videoWidth / canvas.width;
+        const scaleY = videoHeight / canvas.height;
+
+        const cropParams = { 
+            x: Math.max(0, Math.round(c.x * scaleX)), 
+            y: Math.max(0, Math.round(c.y * scaleY)), 
+            width: Math.max(1, Math.round(c.w * scaleX)), // 后端字段通常叫 width
+            height: Math.max(1, Math.round(c.h * scaleY)), // 后端字段通常叫 height
+            // 保留短字段给本地 WASM 用
+            w: Math.max(1, Math.round(c.w * scaleX)),
+            h: Math.max(1, Math.round(c.h * scaleY))
+        };
+
+        // ==========================================
+        // 🚀 策略 A: 尝试云端异步处理 (RabbitMQ)
+        // ==========================================
+        try {
+            applyBtn.textContent = '☁️ 1/3 上传原片...';
+            
+            // A1. 确保视频已上传并获取 ID
+            let videoId = currentVideoId;
+            
+            // 如果是 Blob (录制/本地文件)，必须先上传
+            if (typeof recordedBlob !== 'undefined' && recordedBlob) {
+                // ✅ 修复：更稳健的文件构造方式
+                // 1. 确保拿到的是纯 Blob
+                const rawBlob = recordedBlob instanceof Blob ? recordedBlob : new Blob([recordedBlob], {type: 'video/webm'});
+                
+                // 2. 构造一个新的 File 对象，使用安全的文件名
+                // 注意：使用 Date.now() 避免文件名包含特殊字符
+                const fileName = `raw_${Date.now()}.mp4`;
+                const file = new File([rawBlob], fileName, { type: 'video/mp4' });
+                
+                console.log('正在上传原片:', fileName, '大小:', file.size);
+
+                // ✅ 修复 2: 手动构造请求，绕过 api.js，确保参数完全可控
+                const formData = new FormData();
+                formData.append('video', file);
+                formData.append('title', `raw_crop_${Date.now()}`);
+                formData.append('description', 'auto_crop_upload');
+
+                const token = localStorage.getItem('token');
+                // 假设上传接口是 /api/videos (POST)
+                const upRes = await fetch('/api/v1/videos', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: formData
+                });
+
+                if (!upRes.ok) {
+                    // 获取详细错误信息
+                    const errText = await upRes.text();
+                    throw new Error(`上传失败 (${upRes.status}): ${errText}`);
+                }
+                
+                const uploadRes = await upRes.json();
+                
+                if (!uploadRes || !uploadRes.id) {
+                    throw new Error("上传响应异常，未获取到 ID");
+                }
+                videoId = uploadRes.id;
             }
-          }
-          
-          let waited=0; 
-          while((!activeCropper||!activeCropper.crop) && waited<1500){ 
-            await new Promise(r=>setTimeout(r,100)); 
-            waited+=100; 
-          }
-          
-          if(!activeCropper||!activeCropper.crop){ 
-            if(activeCropper&&activeCropper.canvas){ 
-              activeCropper.crop={x:0,y:0,w:activeCropper.canvas.width,h:activeCropper.canvas.height}; 
-            } else { 
-              if(typeof showMessage==='function') showMessage('未选择裁剪区域','error'); 
-              return; 
-            } 
-          }
 
-          if(typeof showMessage==='function') showMessage('准备 ffmpeg（首次加载可能较慢）...', 'info', 0);
-          await FFmpegWASM.ensure({ log:false });
+            if (!videoId) throw new Error("无法获取视频 ID");
 
-          let inputBlob=null;
-          if(typeof recordedBlob!=='undefined' && recordedBlob) {
-            inputBlob = recordedBlob instanceof Blob ? recordedBlob : new Blob([recordedBlob]);
-          } else if(window.userVideo && userVideo.src){ 
-            const resp = await fetch(userVideo.src); 
-            if(!resp.ok) throw new Error('无法获取视频源: '+resp.status); 
-            inputBlob = await resp.blob(); 
-          }
-          if(!inputBlob){ 
-            if(typeof showMessage==='function') showMessage('未找到输入视频','error'); 
-            return; 
-          }
-          
-          if(typeof showMessage==='function') showMessage('开始转码（浏览器端）...', 'info', 0);
+            // A2. 提交任务
+            applyBtn.textContent = '☁️ 2/3 提交队列...';
+            await DanceMirrorAPI.cropVideoCloud(videoId, cropParams);
+            
+            showMessage('✅ 任务已提交云端，正在处理...', 'success', 2000);
 
-// ✅ 修复：将 canvas 坐标转换为视频原始分辨率坐标
-const c = activeCropper.crop;
-const canvas = activeCropper.canvas;
-const video = activeCropper.video;
+            // A3. 轮询状态
+            let attempts = 0;
+            const maxAttempts = 60; // ✅ 增加到 60 次 (约 60秒)
+            
+            const pollInterval = setInterval(async () => {
+                attempts++;
+                try {
+                    // 注意：这里要用 /v1
+                    const statusRes = await DanceMirrorAPI.getVideoStatus(videoId);
+                    console.log('Cloud status:', statusRes.status);
 
-// 获取视频原始尺寸
-const videoWidth = video.videoWidth || 1920;
-const videoHeight = video.videoHeight || 1080;
+                    if (statusRes.status === 'completed') {
+                        clearInterval(pollInterval);
+                        showMessage('✅ 云端裁剪完成！', 'success');
+                        
+    // 获取裁剪后视频详情
+    const v = await DanceMirrorAPI.getVideo(videoId);
 
-// 计算缩放比例
-const scaleX = videoWidth / canvas.width;
-const scaleY = videoHeight / canvas.height;
+    if (v?.filePath && userVideo) {
+        userVideo.src = v.filePath;
+        userVideo.load();
+        userVideo.play().catch(() => {});
+    }
+                        
+                        closeCropPanel();
+                        applyBtn.disabled = false;
+                        applyBtn.textContent = originalText;
+                    } else if (statusRes.status === 'failed') {
+                        clearInterval(pollInterval);
+                        throw new Error("云端处理报错");
+                    } else if (attempts >= maxAttempts) {
+                        clearInterval(pollInterval);
+                        throw new Error("云端处理超时 (60s)");
+                    }
+                } catch (e) {
+                    // 如果是超时或报错，才停止
+                    if (e.message.includes('超时') || e.message.includes('报错')) {
+                        clearInterval(pollInterval);
+                        console.error(e);
+                        // 降级到本地处理...
+                        fallbackToLocalCrop();
+                    }
+                }
+            }, 1000);
 
-// ✅ 转换坐标到视频原始分辨率
-const cropParams = { 
-    x: Math.max(0, Math.round(c.x * scaleX)), 
-    y: Math.max(0, Math.round(c.y * scaleY)), 
-    w: Math.max(1, Math.round(c.w * scaleX)), 
-    h: Math.max(1, Math.round(c.h * scaleY)) 
-};
 
-// ✅ 添加调试日志
-console.log('Canvas尺寸:', canvas.width, 'x', canvas.height);
-console.log('视频原始尺寸:', videoWidth, 'x', videoHeight);
-console.log('Canvas裁剪区域:', c);
-console.log('转换后的视频裁剪区域:', cropParams);
-          
-          const outBlob = await cropAndTranscode(inputBlob, cropParams, { 
-            format:'mp4', 
-            onProgress: (r)=>{ 
-              const percent = Math.round(r*100);
-              applyBtn.textContent = `转码中... ${percent}%`;
-              if(typeof showMessage==='function') showMessage('转码进度: '+percent+'%','info',0); 
-            } 
-          });
-          
-// ✅ 替换为：
-if(!outBlob) throw new Error('转码未生成输出');
+    // 获取 videoInfo 前先判断 videoId，失败不阻塞
+    if (!videoInfo && videoId) {
+        try {
+            videoInfo = await DanceMirrorAPI.getVideo(videoId);
+        } catch (e) {
+            console.warn('getVideo failed, skip detail fetch:', e);
+        }
+    }            
 
-recordedBlob = outBlob; 
-const dl=document.getElementById('downloadRecBtn'); 
-if(dl) dl.disabled=false; 
-const up=document.getElementById('uploadRecBtn'); 
-if(up) up.disabled=false;
+            // A4. 成功：更新播放器
+            handleSuccess(videoInfo.filePath); // 假设后端返回的是 filePath (MinIO URL)
+            return; // 结束，不执行降级逻辑
 
-// ✅ 加载裁剪后的视频到播放器
-const previewUrl = URL.createObjectURL(outBlob);
-userVideo.srcObject = null;
-userVideo.src = previewUrl;
-userVideo.muted = false;
-userVideo.load();
-userVideo.currentTime = 0;
+        } catch (cloudErr) {
+            console.warn('⚠️ 云端处理失败，切换至本地降级方案:', cloudErr);
+            showMessage(`云端服务繁忙 (${cloudErr.message})，正在切换本地引擎...`, 'warning', 3000);
+            // 继续向下执行，进入本地逻辑
+        }
 
-// ✅ 修复：等待视频元数据加载后，更新容器的宽高比
+        // ==========================================
+        // 🐢 策略 B: 本地 WASM 降级处理 (Fallback)
+        // ==========================================
+        try {
+            applyBtn.textContent = '🐢 本地转码中...';
+            
+            // B1. 准备 Blob
+            let inputBlob = null;
+            if(typeof recordedBlob!=='undefined' && recordedBlob) {
+                inputBlob = recordedBlob instanceof Blob ? recordedBlob : new Blob([recordedBlob]);
+            } else if(window.userVideo && userVideo.src){ 
+                const resp = await fetch(userVideo.src); 
+                inputBlob = await resp.blob(); 
+            }
+
+            if(!inputBlob) throw new Error('未找到视频源');
+
+            // B2. 调用原本的 WASM 函数
+            // 注意：cropAndTranscode 需要 w/h 字段，我们在上面 cropParams 里保留了
+            const outBlob = await cropAndTranscode(inputBlob, cropParams, { 
+                format:'mp4', 
+                onProgress: (r)=>{ 
+                    const percent = Math.round(r*100);
+                    applyBtn.textContent = `本地转码 ${percent}%`;
+                } 
+            });
+
+            if(!outBlob) throw new Error('本地转码失败');
+
+            // B3. 成功：更新全局 Blob 并播放
+            recordedBlob = outBlob; 
+            const localUrl = URL.createObjectURL(outBlob);
+            
+            // 自动下载一份作为备份
+            const a = document.createElement('a'); 
+            a.href = localUrl; 
+            a.download = 'crop_local_'+Date.now()+'.webm'; 
+            a.click();
+
+            handleSuccess(localUrl);
+
+        } catch (localErr) {
+            console.error(localErr);
+            showMessage('❌ 所有处理方案均失败: ' + localErr.message, 'error', 5000);
+            applyBtn.disabled = false;
+            applyBtn.textContent = originalText;
+        }
+
+        // 通用成功回调
+        function handleSuccess(url) {
+            applyBtn.textContent = '✅ 完成';
+            applyBtn.disabled = false;
+            
+            userVideo.srcObject = null;
+            userVideo.src = url;
+            userVideo.muted = false;
+            userVideo.load();
+
+    // ✅ 核心修复：等待视频元数据加载完成后，动态设置容器宽高比
 userVideo.addEventListener('loadedmetadata', () => {
     const wrapper = userVideo.closest('.video-player-wrapper');
     if (wrapper && userVideo.videoWidth && userVideo.videoHeight) {
-        // 使用裁剪后的视频尺寸更新容器比例
-        wrapper.style.aspectRatio = `${userVideo.videoWidth} / ${userVideo.videoHeight}`;
-        console.log('✅ 裁剪后容器比例已更新:', userVideo.videoWidth, 'x', userVideo.videoHeight);
+        // ✅ 强制覆盖所有尺寸属性
+        wrapper.style.cssText = `
+            aspect-ratio: ${userVideo.videoWidth} / ${userVideo.videoHeight} !important;
+            height: auto !important;
+            min-height: unset !important;
+            max-height: unset !important;
+            width: 100%;
+        `;
         
-        // ✅ 可选：显示裁剪后的尺寸信息
-        if(typeof showMessage==='function') {
-            showMessage(`✅ 裁剪完成！尺寸: ${userVideo.videoWidth}×${userVideo.videoHeight}`, 'success', 3000);
-        }
+        console.log(`✅ 右侧容器已强制调整为 ${userVideo.videoWidth}x${userVideo.videoHeight}`);
+        console.log(`   容器实际高度: ${wrapper.offsetHeight}px`);
+        console.log(`   视频实际高度: ${userVideo.offsetHeight}px`);
     }
 }, { once: true });
 
-// 自动下载
-const downloadUrl = URL.createObjectURL(outBlob); 
-const a=document.createElement('a'); 
-a.href=downloadUrl; 
-a.download='crop_'+Date.now()+'.webm'; 
-document.body.appendChild(a); 
-a.click(); 
-a.remove(); 
-URL.revokeObjectURL(downloadUrl);
+            // 启用相关按钮
+            const dl = document.getElementById('downloadRecBtn'); if(dl) dl.disabled=false; 
+            const up = document.getElementById('uploadRecBtn'); if(up) up.disabled=false;
 
-// ✅ 更新提示信息
-if(typeof showMessage==='function') {
-    showMessage('✅ 裁剪完成！已加载到右侧播放器并自动下载', 'success', 4000);
-}
-if(typeof closeCropPanel==='function') closeCropPanel();
-
-// ✅ 可选：自动切换到对照模式
-if (isSingleMode) {
-    document.getElementById('comparisonModeBtn').click();
-}
-          
-          if(typeof showMessage==='function') showMessage('转码完成，已设置为可上传的录制文件','success',4000); 
-          if(typeof closeCropPanel==='function') closeCropPanel();
-          
-        }catch(err){ 
-          console.error('Crop transcode failed', err); 
-          if(typeof showMessage==='function') showMessage('转码失败: '+(err&&err.message?err.message:err),'error',8000);
-        } finally {
-          applyBtn.disabled = false;
-          applyBtn.textContent = originalText;
+            showMessage('✅ 裁剪完成！', 'success', 3000);
+            closeCropPanel();
+            
+            // 自动切到对照模式
+            if (isSingleMode) document.getElementById('comparisonModeBtn').click();
+            
+            // 恢复按钮文字
+            setTimeout(() => {
+                applyBtn.textContent = originalText;
+            }, 2000);
         }
-      });
-    })();
+    });
+})();
+  
     </script>
 </body>
 </html>
