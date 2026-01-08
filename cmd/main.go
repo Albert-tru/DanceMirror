@@ -11,8 +11,11 @@ import (
 	"github.com/Albert-tru/DanceMirror/service/cache"
 	"github.com/Albert-tru/DanceMirror/service/mq"
 	"github.com/Albert-tru/DanceMirror/service/storage"
+	"github.com/Albert-tru/DanceMirror/service/worker"
 	"github.com/Albert-tru/DanceMirror/types"
 )
+
+const QueueName = "video_crop_queue"
 
 func main() {
 	// 1. 连接数据库
@@ -33,8 +36,7 @@ func main() {
 		config.Envs.RedisDB,
 	)
 
-	mq.SetDB(database)
-	// ⭐ 初始化存储客户端并注入到 mq（用于 worker 上传裁剪后文件）
+	// 3. 初始化存储
 	var storageClient storage.VideoStorage
 	if config.Envs.StorageDriver == "minio" {
 		minioClient, err := storage.NewMinIOStorage(
@@ -53,16 +55,13 @@ func main() {
 		storageClient = storage.NewLocalStorage(config.Envs.UploadDir)
 		log.Println("✅ 本地存储初始化成功 (main)")
 	}
-	mq.SetStorageClient(storageClient)
 
-	// 初始化消息队列
-	rabbitMQURL := config.Envs.RabbitMQURL
-
-	// ✅ 新增：重试逻辑
+	// 4. 初始化消息队列 (无全局变量)
+	mqClient := mq.NewRabbitMQClient(config.Envs.RabbitMQURL)
 	var mqErr error
 	for i := 0; i < 15; i++ {
-		log.Printf("🐰 Connecting to RabbitMQ: %s (Attempt %d/15)...", rabbitMQURL, i+1)
-		mqErr = mq.InitRabbitMQ(rabbitMQURL)
+		log.Printf("🐰 Connecting to RabbitMQ: %s (Attempt %d/15)...", config.Envs.RabbitMQURL, i+1)
+		mqErr = mqClient.Connect()
 		if mqErr == nil {
 			log.Println("✅ RabbitMQ connected successfully!")
 			break
@@ -74,14 +73,19 @@ func main() {
 	if mqErr != nil {
 		log.Fatal("❌ Failed to initialize RabbitMQ after retries:", mqErr)
 	}
-	defer mq.Close()
+	defer mqClient.Close()
 
-	// ✅ 注入依赖并启动消费者
-	mq.SetStorageClient(storageClient)
-	mq.StartCropWorker()
+	// 确保队列存在
+	if err := mqClient.EnsureQueue(QueueName); err != nil {
+		log.Fatal("❌ Failed to declare queue:", err)
+	}
 
-	// 3. 启动 Web 服务器[api.go]
-	server := api.NewAPIServer(":"+config.Envs.Port, database, redisClient, storageClient)
+	// 5. 启动 Worker (并发 5)
+	cropWorker := worker.NewCropWorker(mqClient, database, storageClient, QueueName)
+	cropWorker.Start(5)
+
+	// 6. 启动 Web 服务器[api.go]
+	server := api.NewAPIServer(":"+config.Envs.Port, database, redisClient, storageClient, mqClient)
 	if err := server.Run(); err != nil {
 		log.Fatal(err)
 	}

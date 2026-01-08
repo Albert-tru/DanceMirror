@@ -50,9 +50,6 @@ func (h *Handler) RegisterRoutes(router *mux.Router) {
 	router.HandleFunc("/videos/{id}", auth.WithJWTAuth(h.handleDeleteVideo, h.userStore)).Methods(http.MethodDelete)
 	router.HandleFunc("/videos/{id}/crop", auth.WithJWTAuth(h.handleDispatchCropTask, h.userStore)).Methods(http.MethodPost)
 
-	// ✅ 新增：符合前端调用的裁剪路由 (JSON 方式)
-	router.HandleFunc("/videos/{id}/crop", auth.WithJWTAuth(h.handleDispatchCropTask, h.userStore)).Methods(http.MethodPost)
-
 	// 静态文件服务
 	if config.Envs.StorageDriver != "minio" {
 		router.PathPrefix("/uploads/").Handler(http.StripPrefix("/uploads/", http.FileServer(http.Dir(config.Envs.UploadDir))))

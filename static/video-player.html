@@ -1,9 +1,10 @@
 <!-- v2.1 - Fixed camera access check -->
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>视频对比播放器 - DanceMirror</title>
 
     <link rel="stylesheet" href="/static/css/common.css">
@@ -17,30 +18,35 @@
             --danger: #ef4444;
             --warning: #f59e0b;
             --info: #3b82f6;
-            
+
             --bg-primary: #f9fafb;
             --bg-elevated: #ffffff;
             --bg-hover: #f3f4f6;
-            
+
             --border: #e5e7eb;
             --border-dark: #d1d5db;
-            
+
             --text-primary: #111827;
             --text-secondary: #6b7280;
             --text-tertiary: #9ca3af;
-            
+
             --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
             --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
             --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-            
+
             --radius-sm: 6px;
             --radius-md: 8px;
             --radius-lg: 12px;
         }
 
         /* ===== 全局重置 ===== */
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             background: var(--bg-primary);
             color: var(--text-primary);
@@ -60,21 +66,24 @@
             top: 0;
             z-index: 100;
         }
-        
+
         .back-link {
             color: var(--text-secondary);
             text-decoration: none;
             font-weight: 500;
             transition: color 0.2s;
         }
-        .back-link:hover { color: var(--primary); }
-        
+
+        .back-link:hover {
+            color: var(--primary);
+        }
+
         .app-title {
             font-size: 18px;
             font-weight: 600;
             margin: 0;
         }
-        
+
         .btn-icon {
             background: none;
             border: none;
@@ -84,7 +93,10 @@
             border-radius: var(--radius-sm);
             transition: background 0.2s;
         }
-        .btn-icon:hover { background: var(--bg-hover); }
+
+        .btn-icon:hover {
+            background: var(--bg-hover);
+        }
 
         /* ===== 消息提示 ===== */
         .message {
@@ -123,90 +135,103 @@
             top: 80px;
             overflow: hidden;
         }
-        
+
         .sidebar-header {
             padding: 16px 20px;
             border-bottom: 1px solid var(--border);
-            flex-shrink: 0; /* ✅ 新增：防止 header 被压缩 */
+            flex-shrink: 0;
+            /* ✅ 新增：防止 header 被压缩 */
         }
+
         .sidebar-header h2 {
             font-size: 16px;
             font-weight: 600;
             margin: 0;
         }
-        
+
         .video-list {
             display: flex;
-            flex-direction: column;   /* 竖排 */
-            gap: 4px;                 /* 间距 */
+            flex-direction: column;
+            /* 竖排 */
+            gap: 4px;
+            /* 间距 */
             padding: 6px 8px;
             overflow-y: auto;
             overflow-x: hidden;
         }
-        
-.video-item {
 
-    box-sizing: border-box;
-    padding: 4px 6px;
-    margin: 0 0 4px 0;
-    border: 1px solid transparent;
-    border-radius: 4px;
-    background: var(--bg-primary);
-    cursor: pointer;
-    transition: background .15s, border-color .15s, transform .1s; /* ✅ 添加动画 */
-    overflow: hidden;           /* 防止内部内容溢出 */
-}
+        .video-item {
 
-.video-item:hover {
-    background: var(--bg-hover);
-    border-color: var(--primary);
-    transform: translateX(2px); /* ✅ 新增：悬停时轻微右移 */
-}
+            box-sizing: border-box;
+            padding: 4px 6px;
+            margin: 0 0 4px 0;
+            border: 1px solid transparent;
+            border-radius: 4px;
+            background: var(--bg-primary);
+            cursor: pointer;
+            transition: background .15s, border-color .15s, transform .1s;
+            /* ✅ 添加动画 */
+            overflow: hidden;
+            /* 防止内部内容溢出 */
+        }
 
-.video-item.active {
-    background: linear-gradient(135deg,#667eea22 0%,#764ba222 100%);
-    border-color: var(--primary);
-    border-width: 2px; /* ✅ 新增：激活状态边框加粗 */
-}
+        .video-item:hover {
+            background: var(--bg-hover);
+            border-color: var(--primary);
+            transform: translateX(2px);
+            /* ✅ 新增：悬停时轻微右移 */
+        }
 
-.video-item h4 {
-    font-size: 14px; /* ✅ 增大标题字号 */
-    font-weight: 600;
-    margin: 0 0 4px 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
+        .video-item.active {
+            background: linear-gradient(135deg, #667eea22 0%, #764ba222 100%);
+            border-color: var(--primary);
+            border-width: 2px;
+            /* ✅ 新增：激活状态边框加粗 */
+        }
 
-.video-item p {
-    font-size: 12px; /* ✅ 增大描述字号 */
-    color: var(--text-secondary);
-    margin: 0 0 4px 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
+        .video-item h4 {
+            font-size: 14px;
+            /* ✅ 增大标题字号 */
+            font-weight: 600;
+            margin: 0 0 4px 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
 
-.video-item .meta {
-    font-size: 10px;
-    margin-top: 2px;
-    color: #888;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
+        .video-item p {
+            font-size: 12px;
+            /* ✅ 增大描述字号 */
+            color: var(--text-secondary);
+            margin: 0 0 4px 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
 
-.video-item,
-.video-item * {
-    overflow-wrap: anywhere; /* 防长英文/无空格字符串撑宽 */
-}
+        .video-item .meta {
+            font-size: 10px;
+            margin-top: 2px;
+            color: #888;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .video-item,
+        .video-item * {
+            overflow-wrap: anywhere;
+            /* 防长英文/无空格字符串撑宽 */
+        }
 
         /* 加载状态 */
-        .loading-state, .empty-state {
+        .loading-state,
+        .empty-state {
             text-align: center;
             padding: 40px 20px;
             color: var(--text-tertiary);
         }
+
         .spinner {
             width: 40px;
             height: 40px;
@@ -216,8 +241,11 @@
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
         }
+
         @keyframes spin {
-            to { transform: rotate(360deg); }
+            to {
+                transform: rotate(360deg);
+            }
         }
 
         /* ===== 中间主工作区 ===== */
@@ -239,6 +267,7 @@
             background: var(--bg-primary);
             border-radius: var(--radius-md);
         }
+
         .btn-mode {
             flex: 1;
             padding: 10px 16px;
@@ -249,9 +278,11 @@
             cursor: pointer;
             transition: all 0.2s;
         }
+
         .btn-mode:hover {
             background: var(--bg-hover);
         }
+
         .btn-mode-active {
             background: var(--primary);
             color: white;
@@ -269,9 +300,11 @@
         .single-mode-workspace {
             display: none;
         }
+
         body.mode-single .single-mode-workspace {
             display: flex;
         }
+
         body.mode-single .comparison-workspace {
             display: none;
         }
@@ -282,25 +315,28 @@
             background: #000;
             border-radius: var(--radius-md);
             overflow: hidden;
-    min-height: unset !important;
-    max-height: unset !important;
-    height: auto !important;
+            min-height: unset !important;
+            max-height: unset !important;
+            height: auto !important;
             width: 100%;
         }
+
         .video-player-wrapper video {
             width: 100%;
-             height: auto; /* ✅ 改为自动高度 */
+            height: auto;
+            /* ✅ 改为自动高度 */
             display: block;
             object-fit: contain;
-             max-width: 100%;
+            max-width: 100%;
         }
+
         video.mirrored {
             transform: scaleX(-1);
         }
 
         /* 视频标签 */
         .video-label {
-            
+
             position: absolute;
             top: 12px;
             left: 12px;
@@ -311,10 +347,12 @@
             z-index: 10;
             backdrop-filter: blur(10px);
         }
+
         .teaching-label {
             background: rgba(102, 126, 234, 0.9);
             color: rgb(19, 18, 18);
         }
+
         .user-label {
             background: rgba(245, 158, 11, 0.9);
             color: rgb(28, 28, 28);
@@ -334,20 +372,24 @@
             color: var(--text-tertiary);
             pointer-events: none;
         }
+
         .video-empty-state svg {
             margin-bottom: 12px;
             opacity: 0.5;
         }
+
         .video-empty-state h3 {
             font-size: 16px;
             margin: 0 0 8px 0;
         }
+
         .video-empty-state p {
             font-size: 13px;
             margin: 0;
         }
-        video:not([src=""]) ~ .video-empty-state,
-        video[src]:not([src=""]) ~ .video-empty-state {
+
+        video:not([src=""])~.video-empty-state,
+        video[src]:not([src=""])~.video-empty-state {
             display: none;
         }
 
@@ -360,6 +402,7 @@
             background: var(--bg-primary);
             border-radius: var(--radius-md);
         }
+
         .btn-layout {
             flex: 1;
             padding: 8px 12px;
@@ -367,9 +410,11 @@
             border: 1px solid var(--border);
             transition: all 0.2s;
         }
+
         .btn-layout:hover {
             background: var(--bg-hover);
         }
+
         .btn-layout.active {
             background: var(--primary);
             color: white;
@@ -379,15 +424,18 @@
         /* 对照模式视频网格 */
         .video-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr; /* 默认左右布局 */
+            grid-template-columns: 1fr 1fr;
+            /* 默认左右布局 */
             gap: 16px;
             margin-bottom: 16px;
             transition: all 0.3s ease;
         }
 
         .video-grid.layout-vertical {
-            grid-template-columns: 1fr; /* 单列 */
-            grid-template-rows: 1fr 1fr; /* 两行 */
+            grid-template-columns: 1fr;
+            /* 单列 */
+            grid-template-rows: 1fr 1fr;
+            /* 两行 */
         }
 
         /* 播放器控制条 */
@@ -406,25 +454,30 @@
             border-radius: var(--radius-md);
             padding: 12px;
         }
+
         .sync-controls-compact {
             display: flex;
             gap: 8px;
             align-items: center;
         }
+
         .sync-offset-control {
             display: flex;
             align-items: center;
             gap: 8px;
             margin-left: auto;
         }
+
         .sync-offset-control label {
             font-size: 13px;
             font-weight: 500;
             color: var(--text-secondary);
         }
+
         .sync-offset-control input[type="range"] {
             width: 120px;
         }
+
         .sync-offset-control span {
             font-size: 13px;
             font-weight: 600;
@@ -444,99 +497,105 @@
             scroll-behavior: smooth;
         }
 
-/* ===== 云端视频选择弹窗 ===== */
-.cloud-select-modal {
-    position: fixed;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    background: var(--bg-elevated);
-    padding: 24px;
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-lg);
-    z-index: 10000;
-    width: 90%;
-    max-width: 600px;
-    max-height: 70vh;
-    overflow-y: auto;
-}
+        /* ===== 云端视频选择弹窗 ===== */
+        .cloud-select-modal {
+            position: fixed;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--bg-elevated);
+            padding: 24px;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            z-index: 10000;
+            width: 90%;
+            max-width: 600px;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
 
-.cloud-select-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 16px;
-}
+        .cloud-select-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
 
-.cloud-select-header h3 {
-    margin: 0;
-    font-size: 18px;
-}
+        .cloud-select-header h3 {
+            margin: 0;
+            font-size: 18px;
+        }
 
-.cloud-select-close {
-    font-size: 24px;
-    cursor: pointer;
-    color: var(--text-secondary);
-    background: none;
-    border: none;
-    padding: 0;
-}
+        .cloud-select-close {
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--text-secondary);
+            background: none;
+            border: none;
+            padding: 0;
+        }
 
-.cloud-select-close:hover {
-    color: var(--text-primary);
-}
+        .cloud-select-close:hover {
+            color: var(--text-primary);
+        }
 
-.cloud-video-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
+        .cloud-video-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
 
-.cloud-video-item {
-    padding: 12px;
-    background: var(--bg-primary);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    transition: all 0.2s;
-}
+        .cloud-video-item {
+            padding: 12px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
 
-.cloud-video-item:hover {
-    background: var(--bg-hover);
-    border-color: var(--primary);
-}
+        .cloud-video-item:hover {
+            background: var(--bg-hover);
+            border-color: var(--primary);
+        }
 
-.cloud-video-item h4 {
-    margin: 0 0 4px 0;
-    font-size: 14px;
-    font-weight: 600;
-}
+        .cloud-video-item h4 {
+            margin: 0 0 4px 0;
+            font-size: 14px;
+            font-weight: 600;
+        }
 
-.cloud-video-item p {
-    margin: 0;
-    font-size: 12px;
-    color: var(--text-secondary);
-}        
+        .cloud-video-item p {
+            margin: 0;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
 
-/* ✅ 新增：快速操作卡片容器单独定位 */
-.quick-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    /* ✅ 移除 sticky 定位的影响，让它自然跟随 control-panel */
-    margin-top: 0; /* ✅ 紧贴高级控制面板 */
-}
+        /* ✅ 新增：快速操作卡片容器单独定位 */
+        .quick-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            /* ✅ 移除 sticky 定位的影响，让它自然跟随 control-panel */
+            margin-top: 0;
+            /* ✅ 紧贴高级控制面板 */
+        }
+
         /* 快速操作卡片 */
         .quick-actions {
             display: flex;
             flex-direction: column;
             gap: 8px;
-            padding: 12px 8px; /* ✅ 添加内边距 */
-            border-top: 1px solid var(--border); /* ✅ 添加顶部分隔线 */
-            overflow-y: auto; /* ✅ 允许滚动 */
-            max-height: 400px; /* ✅ 限制最大高度 */
+            padding: 12px 8px;
+            /* ✅ 添加内边距 */
+            border-top: 1px solid var(--border);
+            /* ✅ 添加顶部分隔线 */
+            overflow-y: auto;
+            /* ✅ 允许滚动 */
+            max-height: 400px;
+            /* ✅ 限制最大高度 */
         }
-        
+
         .action-card {
             background: var(--bg-elevated);
             border: 2px solid var(--border);
@@ -544,31 +603,37 @@
             padding: 12px;
             transition: all 0.2s;
         }
+
         .action-card:hover {
             box-shadow: var(--shadow-md);
         }
+
         .card-primary {
             border-color: var(--primary);
             background: linear-gradient(135deg, #667eea11 0%, #764ba211 100%);
         }
+
         .card-disabled {
             opacity: 0.5;
             pointer-events: none;
         }
-        
+
         .card-icon {
             font-size: 24px;
             margin-bottom: 6px;
         }
+
         .action-card h4 {
             font-size: 13px;
             margin: 0 0 4px 0;
         }
+
         .action-card p {
             font-size: 11px;
             color: var(--text-secondary);
             margin: 0 0 8px 0;
         }
+
         .card-status {
             display: inline-block;
             padding: 4px 8px;
@@ -591,6 +656,7 @@
             font-weight: bold;
             color: var(--danger);
         }
+
         .recording-indicator {
             display: inline-block;
             width: 8px;
@@ -600,9 +666,18 @@
             margin-right: 6px;
             animation: blink 1s infinite;
         }
+
         @keyframes blink {
-            0%, 50% { opacity: 1; }
-            51%, 100% { opacity: 0.3; }
+
+            0%,
+            50% {
+                opacity: 1;
+            }
+
+            51%,
+            100% {
+                opacity: 0.3;
+            }
         }
 
         /* 高级控制折叠面板 */
@@ -612,6 +687,7 @@
             border-radius: var(--radius-md);
             overflow: hidden;
         }
+
         .section-toggle {
             width: 100%;
             padding: 12px 16px;
@@ -624,34 +700,40 @@
             justify-content: space-between;
             align-items: center;
         }
+
         .section-toggle:hover {
             background: var(--bg-hover);
         }
+
         .toggle-icon {
             transition: transform 0.2s;
         }
+
         .section-toggle.active .toggle-icon {
             transform: rotate(180deg);
         }
-        
+
         .advanced-controls-content {
             max-height: 0;
             overflow: hidden;
             transition: max-height 0.3s ease;
         }
-         .advanced-controls-content.collapsed {
+
+        .advanced-controls-content.collapsed {
             /* ✅ 新增：添加 collapsed 类时才折叠 */
             max-height: 0;
         }
+
         .advanced-controls-content.show {
             max-height: 500px;
         }
-        
+
         .control-section {
             /* ✅ 修正：减少内边距 */
             padding: 12px 16px;
             border-top: 1px solid var(--border);
         }
+
         .control-section h4 {
             font-size: 14px;
             /* ✅ 修正：减少下边距 */
@@ -660,6 +742,7 @@
             justify-content: space-between;
             align-items: center;
         }
+
         .current-value {
             color: var(--primary);
             font-weight: 700;
@@ -676,63 +759,73 @@
             cursor: pointer;
             transition: all 0.2s;
         }
+
         .btn:hover:not(:disabled) {
             background: var(--bg-hover);
             border-color: var(--border-dark);
         }
+
         .btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
         }
+
         .btn.active {
             background: var(--primary);
             color: rgb(247, 243, 243);
             border-color: var(--primary);
         }
-        
+
         .btn-block {
             width: 100%;
             margin-bottom: 8px;
         }
+
         .btn-sm {
             padding: 6px 12px;
             font-size: 12px;
         }
+
         .btn-control {
             padding: 8px 12px;
             font-size: 14px;
         }
-        
+
         .btn-danger {
             background: var(--danger);
             color: white;
             border-color: var(--danger);
         }
+
         .btn-danger:hover:not(:disabled) {
             background: #dc2626;
         }
+
         .btn-secondary {
             background: var(--text-secondary);
             color: white;
             border-color: var(--text-secondary);
         }
+
         .btn-success {
             background: var(--success);
             color: white;
             border-color: var(--success);
         }
-        
+
         .speed-buttons {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 6px;
         }
+
         .btn-group {
             display: flex;
             gap: 6px;
             /* ✅ 修正：减少下边距 */
             margin-bottom: 6px;
         }
+
         .btn-group .btn {
             flex: 1;
         }
@@ -753,10 +846,12 @@
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 6px;
-        }        
+        }
 
         /* ===== 通用工具类 ===== */
-        .hidden { display: none !important; }
+        .hidden {
+            display: none !important;
+        }
 
         /* ===== 裁剪面板样式 ===== */
         .crop-panel {
@@ -774,6 +869,7 @@
             max-height: 85vh;
             overflow: auto;
         }
+
         .crop-close {
             position: absolute;
             right: 16px;
@@ -782,24 +878,29 @@
             cursor: pointer;
             color: var(--text-secondary);
         }
+
         .crop-close:hover {
             color: var(--text-primary);
         }
+
         .crop-preview {
             margin-top: 16px;
         }
+
         #cropCanvas {
             width: 100%;
             background: #000;
             border-radius: var(--radius-md);
             display: block;
         }
+
         .preset-ratios {
             display: flex;
             gap: 8px;
             flex-wrap: wrap;
             margin-top: 12px;
         }
+
         .ratio-btn {
             padding: 8px 16px;
             border: 1px solid var(--border);
@@ -808,14 +909,17 @@
             cursor: pointer;
             font-size: 13px;
         }
+
         .ratio-btn:hover {
             background: var(--bg-hover);
         }
+
         .ratio-btn.active {
             background: var(--primary);
             color: white;
             border-color: var(--primary);
         }
+
         .crop-actions {
             margin-top: 16px;
             display: flex;
@@ -828,17 +932,20 @@
                 grid-template-columns: 240px 1fr 280px;
             }
         }
-        
+
         @media (max-width: 1024px) {
             .main-layout {
                 grid-template-columns: 1fr;
             }
-            .sidebar, .control-panel {
+
+            .sidebar,
+            .control-panel {
                 position: static;
                 max-height: none;
             }
         }
-               /* === 按钮配色统一覆盖（新） === */
+
+        /* === 按钮配色统一覆盖（新） === */
         :root {
             --btn-bg: var(--bg-primary);
             --btn-bg-hover: var(--bg-hover);
@@ -854,11 +961,13 @@
             color: var(--btn-text);
             border: 1px solid var(--btn-border);
         }
+
         .btn:hover:not(:disabled) {
             background: var(--btn-bg-hover);
             color: var(--btn-text);
             border-color: var(--border-dark);
         }
+
         .btn.active,
         .btn.btn-primary {
             background: var(--btn-active-bg);
@@ -872,8 +981,9 @@
             color: var(--btn-outline-text);
             border-color: var(--primary);
         }
+
         .btn-secondary:hover:not(:disabled) {
-            background: rgba(102,126,234,0.08);
+            background: rgba(102, 126, 234, 0.08);
         }
 
         /* 危险 / 成功保持高对比 */
@@ -882,14 +992,20 @@
             color: #fff;
             border-color: var(--danger);
         }
-        .btn-danger:hover:not(:disabled) { background: #dc2626; }
+
+        .btn-danger:hover:not(:disabled) {
+            background: #dc2626;
+        }
 
         .btn-success {
             background: var(--success);
             color: #fff;
             border-color: var(--success);
         }
-        .btn-success:hover:not(:disabled) { background: #059669; }
+
+        .btn-success:hover:not(:disabled) {
+            background: #059669;
+        }
 
         /* 控制条按钮尺寸与配色 */
         .btn-control {
@@ -897,9 +1013,11 @@
             color: var(--text-primary);
             border: 1px solid var(--border);
         }
+
         .btn-control:hover:not(:disabled) {
             background: var(--bg-hover);
         }
+
         .btn-control.active {
             background: var(--primary);
             color: #fff;
@@ -911,6 +1029,7 @@
             background: var(--bg-primary);
             color: var(--text-secondary);
         }
+
         .speed-buttons .btn.active {
             background: var(--primary);
             color: #fff;
@@ -923,6 +1042,7 @@
             color: var(--text-primary);
             border: 1px solid var(--border);
         }
+
         .ab-controls-grid .btn.btn-success {
             background: var(--success);
             color: #fff;
@@ -939,6 +1059,7 @@
         .action-card .btn {
             background: var(--bg-primary);
         }
+
         .action-card .btn:hover:not(:disabled) {
             background: var(--bg-hover);
         }
@@ -950,6 +1071,7 @@
             color: #fff;
             border-color: var(--primary);
         }
+
         #mirrorOriginal.active,
         #mirrorUser.active {
             background: var(--primary);
@@ -958,6 +1080,7 @@
         }
     </style>
 </head>
+
 <body>
     <!-- ✅ START: 新的三栏布局 HTML 结构 -->
     <div class="app-container">
@@ -1005,15 +1128,17 @@
                         <div class="video-label teaching-label">📚 教学视频</div>
                         <video id="singleVideo" controls crossorigin="anonymous"></video>
                         <div class="video-empty-state" id="singleVideoEmpty">
-                            <svg width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                <path d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
-                                <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            <svg width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="1.5">
+                                <path
+                                    d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                             <h3>选择左侧视频开始学习</h3>
                             <p>点击视频库中的任意视频即可播放</p>
                         </div>
                     </div>
-                    
+
                     <div class="player-controls">
                         <button class="btn btn-control" id="singlePlayBtn">▶️ 播放</button>
                         <button class="btn btn-control" id="singlePauseBtn">⏸️ 暂停</button>
@@ -1024,7 +1149,7 @@
 
                 <!-- 对照模式容器 -->
                 <div id="comparisonContainer" class="video-workspace comparison-workspace">
-                                        <!-- ✅ 新增：布局切换按钮 -->
+                    <!-- ✅ 新增：布局切换按钮 -->
                     <div class="layout-switcher">
                         <button class="btn btn-sm btn-layout active" data-layout="horizontal">↔️ 左右对照</button>
                         <button class="btn btn-sm btn-layout" data-layout="vertical">↕️ 上下对照</button>
@@ -1035,9 +1160,11 @@
                             <div class="video-label teaching-label">📚 教学视频</div>
                             <video id="originalVideo" controls crossorigin="anonymous"></video>
                             <div class="video-empty-state" id="originalVideoEmpty">
-                                <svg width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                    <path d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
-                                    <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                <svg width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="1.5">
+                                    <path
+                                        d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                    <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                                 <p>点击左侧视频库选择教学视频</p>
                             </div>
@@ -1048,9 +1175,10 @@
                             <div class="video-label user-label">🎥 我的视频</div>
                             <video id="userVideo" controls muted></video>
                             <div class="video-empty-state" id="userVideoEmpty">
-                                <svg width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                    <circle cx="12" cy="12" r="10"/>
-                                    <circle cx="12" cy="12" r="3" fill="currentColor"/>
+                                <svg width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="1.5">
+                                    <circle cx="12" cy="12" r="10" />
+                                    <circle cx="12" cy="12" r="3" fill="currentColor" />
                                 </svg>
                                 <p>点击右侧"开始录制"或"上传本地视频"</p>
                             </div>
@@ -1117,7 +1245,7 @@
                     </div>
                 </div>
                 <!-- 快速操作卡片 -->
-                                 <div class="quick-actions" id="quickActions">
+                <div class="quick-actions" id="quickActions">
                     <div class="action-card card-disabled" id="actionSelectVideo">
                         <div class="card-icon"></div>
                         <h4>1. 选择教学视频</h4>
@@ -1137,7 +1265,7 @@
                     <div class="action-card" id="actionUpload">
                         <div class="card-icon"></div>
                         <h4>或上传本地视频</h4>
-                        <input id="localVideoInput" type="file" accept="video/*" class="hidden"/>
+                        <input id="localVideoInput" type="file" accept="video/*" class="hidden" />
                         <button class="btn btn-block" id="uploadLocalBtn">选择文件</button>
                     </div>
 
@@ -1145,7 +1273,7 @@
                         <div class="card-icon"></div>
                         <h4>或选择视频</h4>
                         <button class="btn btn-block" id="selectCloudBtn">☁️ 从云端选择</button>
-                        <input id="localVideoInput" type="file" accept="video/*" class="hidden"/>
+                        <input id="localVideoInput" type="file" accept="video/*" class="hidden" />
                         <button class="btn btn-block" id="uploadLocalBtn">💾 从本地上传</button>
                     </div>
 
@@ -1169,18 +1297,18 @@
     <!-- ✅ END: 新的三栏布局 HTML 结构 -->
 
     <!-- ✅ 新增：云端视频选择弹窗 -->
-<div id="cloudSelectModal" class="cloud-select-modal hidden" aria-hidden="true">
-    <div class="cloud-select-header">
-        <h3>☁️ 选择云端视频</h3>
-        <button class="cloud-select-close" id="cloudSelectClose">✖</button>
-    </div>
-    <div class="cloud-video-list" id="cloudVideoList">
-        <div class="loading-state">
-            <div class="spinner"></div>
-            <p>加载中...</p>
+    <div id="cloudSelectModal" class="cloud-select-modal hidden" aria-hidden="true">
+        <div class="cloud-select-header">
+            <h3>☁️ 选择云端视频</h3>
+            <button class="cloud-select-close" id="cloudSelectClose">✖</button>
+        </div>
+        <div class="cloud-video-list" id="cloudVideoList">
+            <div class="loading-state">
+                <div class="spinner"></div>
+                <p>加载中...</p>
+            </div>
         </div>
     </div>
-</div>
 
     <!-- 裁剪面板（录制或本地视频加载后可打开） -->
     <div id="cropPanel" class="crop-panel hidden" aria-hidden="true">
@@ -1195,7 +1323,8 @@
         </div>
         <div class="crop-preview">
             <canvas id="cropCanvas" width="1280" height="720"></canvas>
-            <div style="margin-top:8px; font-size:13px; color:#666;">提示：当前实现导出裁剪后的静态帧（PNG）。如需导出裁剪后的视频，可集成 ffmpeg.wasm。</div>
+            <div style="margin-top:8px; font-size:13px; color:#666;">提示：当前实现导出裁剪后的静态帧（PNG）。如需导出裁剪后的视频，可集成 ffmpeg.wasm。
+            </div>
         </div>
         <div class="crop-actions">
             <button id="applyCropBtn" type="button" class="btn btn-success">✅ 应用裁剪并下载</button>
@@ -1224,7 +1353,7 @@
         let isSingleMode = false;
 
         let abLoopActive = false;
-        let abLoopVideo = null;    
+        let abLoopVideo = null;
 
         // cropper state
         const cropPanel = document.getElementById('cropPanel');
@@ -1232,9 +1361,9 @@
         let activeCropper = null;
 
         // utils
-        function showMessage(text, type='info', timeout=3000) { Utils.showMessage('message', text, type, timeout); }
+        function showMessage(text, type = 'info', timeout = 3000) { Utils.showMessage('message', text, type, timeout); }
 
-                // ⭐ 修复：如果 api.js 没更新，在这里自动补全缺失的云端裁剪方法
+        // ⭐ 修复：如果 api.js 没更新，在这里自动补全缺失的云端裁剪方法
         if (typeof DanceMirrorAPI !== 'undefined') {
             if (!DanceMirrorAPI.cropVideoCloud) {
                 DanceMirrorAPI.cropVideoCloud = async (videoId, params) => {
@@ -1264,10 +1393,10 @@
         }
 
 
-        window.onload = function() {
+        window.onload = function () {
             if (!DanceMirrorAPI.isLoggedIn()) {
                 showMessage('请先登录，正在跳转...', 'error', 1500);
-                setTimeout(()=>location.href='/static/index.html', 1500);
+                setTimeout(() => location.href = '/static/index.html', 1500);
                 return;
             }
             initSyncControls();
@@ -1283,7 +1412,7 @@
             // ✅ 新增：初始化高级控制折叠
             initAdvancedControls();
             // ✅ 新增：初始化状态管理
-            initStateManagement();            
+            initStateManagement();
         };
 
 
@@ -1291,14 +1420,14 @@
         function initAdvancedControls() {
             const toggleBtn = document.getElementById('toggleAdvanced');
             const content = document.getElementById('advancedContent');
-            
+
             // ✅ 默认设置为展开状态
             toggleBtn.classList.add('active');
             content.classList.add('show');
-            
+
             toggleBtn.addEventListener('click', () => {
                 const isExpanded = toggleBtn.classList.contains('active');
-                
+
                 if (isExpanded) {
                     // 折叠
                     toggleBtn.classList.remove('active');
@@ -1309,7 +1438,7 @@
                     content.classList.add('show');
                 }
             });
-        }        
+        }
 
         // ✅ 新增：状态管理（控制卡片的激活/禁用）
         function initStateManagement() {
@@ -1320,24 +1449,24 @@
 
 
         // ---------- sync controls ----------
-        function initSyncControls(){
-            offsetRange.addEventListener('input', (e)=>{
+        function initSyncControls() {
+            offsetRange.addEventListener('input', (e) => {
                 syncOffset = parseFloat(e.target.value);
-                offsetLabel.textContent = syncOffset.toFixed(1)+'s';
+                offsetLabel.textContent = syncOffset.toFixed(1) + 's';
             });
 
             // 这些主控按钮只在“对照模式”下起作用
-            document.getElementById('masterPlay').addEventListener('click', ()=> {
-                if (!isSingleMode) originalVideo.play().catch(()=>{});
+            document.getElementById('masterPlay').addEventListener('click', () => {
+                if (!isSingleMode) originalVideo.play().catch(() => { });
             });
-            document.getElementById('masterPause').addEventListener('click', ()=> {
+            document.getElementById('masterPause').addEventListener('click', () => {
                 if (!isSingleMode) originalVideo.pause();
             });
-            document.getElementById('masterRestart').addEventListener('click', ()=> {
+            document.getElementById('masterRestart').addEventListener('click', () => {
                 if (!isSingleMode) {
                     originalVideo.currentTime = 0;
                     syncUserVideoTime();
-                    originalVideo.play().catch(()=>{});
+                    originalVideo.play().catch(() => { });
                 }
             });
 
@@ -1352,22 +1481,22 @@
             });
 
             // 这些事件监听也只在“对照模式”下生效
-            originalVideo.addEventListener('play', ()=> {
+            originalVideo.addEventListener('play', () => {
                 if (isSingleMode) return;
-                try { if (userVideo.src) userVideo.play(); } catch (e) {}
+                try { if (userVideo.src) userVideo.play(); } catch (e) { }
             });
-            originalVideo.addEventListener('pause', ()=> {
+            originalVideo.addEventListener('pause', () => {
                 if (isSingleMode) return;
-                try { userVideo.pause(); } catch (e) {}
+                try { userVideo.pause(); } catch (e) { }
             });
-            originalVideo.addEventListener('seeked', ()=> {
+            originalVideo.addEventListener('seeked', () => {
                 if (isSingleMode) return;
                 syncUserVideoTime();
             });
             // 注意：timeupdate 事件在切换模式时需要特殊处理，见 initModeSwitcher
         }
 
-                // ✅ 新增：初始化布局切换功能
+        // ✅ 新增：初始化布局切换功能
         function initLayoutSwitcher() {
             const layoutButtons = document.querySelectorAll('.btn-layout');
             const videoGrid = document.getElementById('videoGrid');
@@ -1375,11 +1504,11 @@
             layoutButtons.forEach(btn => {
                 btn.addEventListener('click', () => {
                     const layout = btn.dataset.layout;
-                    
+
                     // 更新按钮激活状态
                     layoutButtons.forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
-                    
+
                     // 更新网格布局
                     if (layout === 'vertical') {
                         videoGrid.classList.add('layout-vertical');
@@ -1393,25 +1522,25 @@
         }
 
         // ---------- 单视频控制 ----------
-        function initSingleControls(){
+        function initSingleControls() {
             // ✅ 修正：使用正确的按钮 ID
             const playBtn = document.getElementById('singlePlayBtn');
             const pauseBtn = document.getElementById('singlePauseBtn');
             const restartBtn = document.getElementById('singleRestartBtn');
 
-            if (playBtn) playBtn.addEventListener('click', ()=> {
-                if (singleVideo && singleVideo.src) singleVideo.play().catch(()=>{});
+            if (playBtn) playBtn.addEventListener('click', () => {
+                if (singleVideo && singleVideo.src) singleVideo.play().catch(() => { });
                 else showMessage('单视频未加载', 'error');
             });
-            if (pauseBtn) pauseBtn.addEventListener('click', ()=> {
+            if (pauseBtn) pauseBtn.addEventListener('click', () => {
                 if (singleVideo) singleVideo.pause();
             });
-            if (restartBtn) restartBtn.addEventListener('click', ()=> {
+            if (restartBtn) restartBtn.addEventListener('click', () => {
                 if (singleVideo && singleVideo.src) {
-                    try { singleVideo.currentTime = 0; singleVideo.play().catch(()=>{}); } catch(e){ }
+                    try { singleVideo.currentTime = 0; singleVideo.play().catch(() => { }); } catch (e) { }
                 }
             });
-            
+
             // 新增：单视频循环播放按钮逻辑
             const singleLoopBtn = document.getElementById('singleLoopToggle');
             singleLoopBtn.addEventListener('click', () => {
@@ -1419,21 +1548,21 @@
                 singleVideo.loop = shouldLoop;
                 singleLoopBtn.classList.toggle('active', shouldLoop);
                 showMessage('单视频循环: ' + (shouldLoop ? '开启' : '关闭'), 'success', 1200);
-            });       
+            });
         }
 
         // ---------- keyboard shortcuts（改为作用于当前模式的 activeVideo） ----------
-        document.addEventListener('keydown', (e)=>{
-            if (e.target.tagName==='INPUT' || e.target.tagName==='TEXTAREA') return;
-            
+        document.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
             // 智能判断：获取当前正在显示的视频
             const activeVideo = isSingleMode ? singleVideo : originalVideo;
             if (!activeVideo) return; // 如果没有任何视频，则不执行操作
 
-            switch(e.code){
+            switch (e.code) {
                 case 'Space':
                     e.preventDefault();
-                    if (activeVideo.paused) activeVideo.play().catch(()=>{}); else activeVideo.pause();
+                    if (activeVideo.paused) activeVideo.play().catch(() => { }); else activeVideo.pause();
                     break;
                 case 'ArrowLeft':
                     e.preventDefault();
@@ -1462,37 +1591,37 @@
             }
         });
 
-        function syncUserVideoTime(){
+        function syncUserVideoTime() {
             if (!userVideo.src || userVideo.readyState < 2) return;
             const target = originalVideo.currentTime + syncOffset;
             const clamped = Math.max(0, Math.min(userVideo.duration || Infinity, target));
             if (Math.abs(userVideo.currentTime - clamped) > 0.2) {
-                try { userVideo.currentTime = clamped; } catch(e){ console.log('sync err', e); }
+                try { userVideo.currentTime = clamped; } catch (e) { console.log('sync err', e); }
             }
         }
 
         // ---------- recording controls ----------
-        function initRecordingControls(){
+        function initRecordingControls() {
             document.getElementById('startRecBtn').addEventListener('click', startRecording);
             document.getElementById('stopRecBtn').addEventListener('click', stopRecording);
             document.getElementById('downloadRecBtn').addEventListener('click', downloadRecording);
             document.getElementById('uploadRecBtn').addEventListener('click', uploadRecording);
         }
 
-        async function startRecording(){
+        async function startRecording() {
             try {
                 // 检查浏览器支持
                 if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                     throw new Error("您的浏览器不支持摄像头访问。请使用最新版 Chrome、Firefox 或 Edge 浏览器");
                 }
-                const stream = await navigator.mediaDevices.getUserMedia({ video:true, audio:true });
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 recordedChunks = [];
                 const options = { mimeType: 'video/webm;codecs=vp8,opus' };
                 if (!MediaRecorder.isTypeSupported(options.mimeType)) options.mimeType = 'video/webm';
                 mediaRecorder = new MediaRecorder(stream, options);
-                mediaRecorder.ondataavailable = e => { if (e.data && e.data.size>0) recordedChunks.push(e.data); };
+                mediaRecorder.ondataavailable = e => { if (e.data && e.data.size > 0) recordedChunks.push(e.data); };
                 mediaRecorder.onstop = () => {
-                    stream.getTracks().forEach(t=>t.stop());
+                    stream.getTracks().forEach(t => t.stop());
                     recordedBlob = new Blob(recordedChunks, { type: 'video/webm' });
                     const url = URL.createObjectURL(recordedBlob);
                     userVideo.srcObject = null;
@@ -1514,12 +1643,12 @@
                 document.getElementById('stopRecBtn').disabled = false;
                 showMessage('录制已开始', 'info', 1200);
             } catch (err) {
-                showMessage('无法访问摄像头/麦克风: ' + (err.message||err), 'error', 4000);
+                showMessage('无法访问摄像头/麦克风: ' + (err.message || err), 'error', 4000);
                 console.error(err);
             }
         }
 
-        function stopRecording(){
+        function stopRecording() {
             if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
             stopRecordingTimer();
             document.getElementById('startRecBtn').disabled = false;
@@ -1531,7 +1660,7 @@
             document.getElementById('actionExport').classList.remove('card-disabled');
             document.getElementById('downloadRecBtn').disabled = false;
             document.getElementById('uploadRecBtn').disabled = false;
-            
+
             // ✅ 新增：更新 Step 2 的状态为"已完成"
             const actionRecord = document.getElementById('actionRecord');
             actionRecord.classList.remove('card-primary');
@@ -1544,7 +1673,7 @@
             } else {
                 recordStatus.textContent = '已完成 ✓';
             }
-            
+
             // ✅ 新增：高亮 Step 3（开始对比）
             const actionCompare = document.getElementById('actionCompare');
             actionCompare.classList.add('card-primary');
@@ -1554,23 +1683,23 @@
             }
 
             // 打开裁剪面板（如果有录制文件或本地视频）
-            setTimeout(()=> {
+            setTimeout(() => {
                 if (recordedBlob || userVideo.src) openCropPanel();
             }, 200);
         }
 
 
-        function startRecordingTimer(){
+        function startRecordingTimer() {
             recTimer.textContent = '0:00';
-            recTimerInterval = setInterval(()=>{
-                const elapsed = Math.floor((Date.now() - recStartTime)/1000);
-                const mins = Math.floor(elapsed/60), secs = elapsed%60;
-                recTimer.textContent = mins + ':' + String(secs).padStart(2,'0');
+            recTimerInterval = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - recStartTime) / 1000);
+                const mins = Math.floor(elapsed / 60), secs = elapsed % 60;
+                recTimer.textContent = mins + ':' + String(secs).padStart(2, '0');
             }, 500);
         }
-        function stopRecordingTimer(){ if (recTimerInterval) { clearInterval(recTimerInterval); recTimerInterval = null; } }
+        function stopRecordingTimer() { if (recTimerInterval) { clearInterval(recTimerInterval); recTimerInterval = null; } }
 
-        function downloadRecording(){
+        function downloadRecording() {
             if (!recordedBlob) { showMessage('没有可下载的录制', 'error', 2000); return; }
             const url = URL.createObjectURL(recordedBlob);
             const a = document.createElement('a'); a.href = url; a.download = 'recording_' + Date.now() + '.webm'; document.body.appendChild(a); a.click(); a.remove();
@@ -1578,22 +1707,22 @@
             showMessage('下载已开始', 'success', 1500);
         }
 
-        async function uploadRecording(){
+        async function uploadRecording() {
             const file = recordedBlob instanceof File ? recordedBlob : (recordedBlob ? new File([recordedBlob], 'recording_' + Date.now() + '.webm', { type: recordedBlob.type }) : null);
             if (!file) { showMessage('没有可上传的录制', 'error', 2000); return; }
             try {
                 showMessage('正在上传...', 'info');
                 await DanceMirrorAPI.uploadVideo(file, { title: '录制_' + new Date().toLocaleString(), description: '用户录制视频' });
                 showMessage('上传成功', 'success', 2000);
-                setTimeout(()=> loadVideos(), 500);
+                setTimeout(() => loadVideos(), 500);
             } catch (err) {
                 console.error(err);
-                showMessage('上传失败: ' + (err.message||err), 'error', 4000);
+                showMessage('上传失败: ' + (err.message || err), 'error', 4000);
             }
         }
 
         // ---------- video list ----------
-        async function loadVideos(){
+        async function loadVideos() {
             const listEl = document.getElementById('videoList');
             try {
                 const videos = await DanceMirrorAPI.getVideos();
@@ -1602,21 +1731,21 @@
                     videos.forEach((video, idx) => {
                         const item = document.createElement('div'); item.className = 'video-item';
                         item.innerHTML = '<h4>' + Utils.escapeHtml(video.title) + '</h4><p>' + Utils.escapeHtml(video.description || '暂无描述') + '</p><p style="font-size:11px;color:#999;margin-top:6px;">' + Utils.formatDate(video.createdAt) + '</p>';
-                        item.onclick = ()=> selectVideo(video, item);
+                        item.onclick = () => selectVideo(video, item);
                         listEl.appendChild(item);
-                        if (idx===0) selectVideo(video, item);
+                        if (idx === 0) selectVideo(video, item);
                     });
                 } else {
                     listEl.innerHTML = '<p style="text-align:center;color:#666;">暂无视频</p>';
                 }
             } catch (err) {
                 console.error(err);
-                showMessage('加载失败: ' + (err.message||err), 'error');
+                showMessage('加载失败: ' + (err.message || err), 'error');
                 listEl.innerHTML = '<p style="text-align:center;color:#666;">加载失败</p>';
             }
         }
 
-        function selectVideo(video, itemEl){
+        function selectVideo(video, itemEl) {
             currentVideoId = video.id;
             let videoPath = video.filePath || '';
             if (!videoPath) {
@@ -1636,46 +1765,46 @@
             originalVideo.load();
             singleVideo.load(); // ✅ 加载单视频模式的视频
 
-originalVideo.addEventListener('loadedmetadata', () => {
-    const wrapper = originalVideo.closest('.video-player-wrapper');
-    if (wrapper && originalVideo.videoWidth && originalVideo.videoHeight) {
-        wrapper.style.cssText = `
+            originalVideo.addEventListener('loadedmetadata', () => {
+                const wrapper = originalVideo.closest('.video-player-wrapper');
+                if (wrapper && originalVideo.videoWidth && originalVideo.videoHeight) {
+                    wrapper.style.cssText = `
             aspect-ratio: ${originalVideo.videoWidth} / ${originalVideo.videoHeight} !important;
             height: auto !important;
             min-height: unset !important;
             max-height: unset !important;
             width: 100%;
         `;
-    }
-}, { once: true });
+                }
+            }, { once: true });
 
-singleVideo.addEventListener('loadedmetadata', () => {
-    const wrapper = singleVideo.closest('.video-player-wrapper');
-    if (wrapper && singleVideo.videoWidth && singleVideo.videoHeight) {
-        wrapper.style.cssText = `
+            singleVideo.addEventListener('loadedmetadata', () => {
+                const wrapper = singleVideo.closest('.video-player-wrapper');
+                if (wrapper && singleVideo.videoWidth && singleVideo.videoHeight) {
+                    wrapper.style.cssText = `
             aspect-ratio: ${singleVideo.videoWidth} / ${singleVideo.videoHeight} !important;
             height: auto !important;
             min-height: unset !important;
             max-height: unset !important;
             width: 100%;
         `;
-    }
-}, { once: true });
+                }
+            }, { once: true });
 
 
-    document.querySelectorAll('.video-item').forEach(i=>i.classList.remove('active'));
-    if (itemEl) itemEl.classList.add('active');
-    clearABLoop();
+            document.querySelectorAll('.video-item').forEach(i => i.classList.remove('active'));
+            if (itemEl) itemEl.classList.add('active');
+            clearABLoop();
 
-    // ✅ 新增：更新快速操作卡片状态
-    document.getElementById('actionSelectVideo').classList.remove('card-disabled');
-    document.getElementById('actionSelectVideo').querySelector('.card-status').textContent = '已完成 ✓';
-    document.getElementById('actionRecord').classList.remove('card-disabled');
+            // ✅ 新增：更新快速操作卡片状态
+            document.getElementById('actionSelectVideo').classList.remove('card-disabled');
+            document.getElementById('actionSelectVideo').querySelector('.card-status').textContent = '已完成 ✓';
+            document.getElementById('actionRecord').classList.remove('card-disabled');
         }
 
         // ---------- mode switcher ----------
 
-        function initModeSwitcher(){
+        function initModeSwitcher() {
             const sm = document.getElementById('singleModeBtn'), cm = document.getElementById('comparisonModeBtn');
             const body = document.body;
             const single = document.getElementById('singleVideoContainer'), compare = document.getElementById('comparisonContainer');
@@ -1691,7 +1820,7 @@ singleVideo.addEventListener('loadedmetadata', () => {
             if (isSingleMode) { sm.classList.add('btn-primary'); cm.classList.remove('btn-primary'); }
             else { cm.classList.add('btn-primary'); sm.classList.remove('btn-primary'); }
 
-            sm.addEventListener('click', ()=> {
+            sm.addEventListener('click', () => {
                 if (isSingleMode) return;
                 isSingleMode = true;
                 body.classList.add('mode-single'); // CSS will show single container
@@ -1705,71 +1834,71 @@ singleVideo.addEventListener('loadedmetadata', () => {
                         svid.src = originalVideo.src;
                     }
                     svid.load();
-                } catch(e){ console.warn('set single src failed', e); }
+                } catch (e) { console.warn('set single src failed', e); }
 
 
-                sm.classList.add('btn-primary'); 
+                sm.classList.add('btn-primary');
                 cm.classList.remove('btn-primary');
-                
+
                 // ✅ 新增：切换模式后重新绑定 AB 循环
                 reattachABLoopAfterModeSwitch();
             });
 
-            cm.addEventListener('click', ()=> {
+            cm.addEventListener('click', () => {
                 if (!isSingleMode) return;
                 isSingleMode = false;
                 body.classList.remove('mode-single');
                 body.classList.add('mode-comparison');
                 cm.classList.add('btn-primary'); sm.classList.remove('btn-primary');
 
-                                // ✅ 新增：切换模式后重新绑定 AB 循环
+                // ✅ 新增：切换模式后重新绑定 AB 循环
                 reattachABLoopAfterModeSwitch();
             });
         }
-        
+
         // ---------- local upload ----------
-        function initLocalUpload(){
+        function initLocalUpload() {
             const fileInput = document.getElementById('localVideoInput'), uploadBtn = document.getElementById('uploadLocalBtn');
-            uploadBtn.addEventListener('click', ()=> fileInput.click());
-            fileInput.addEventListener('change', (e)=> {
+            uploadBtn.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', (e) => {
                 const f = e.target.files && e.target.files[0];
                 if (!f) return;
                 if (!f.type.startsWith('video/')) { showMessage('请选择视频文件', 'error'); return; }
                 if (f.size > 524288000) { showMessage('文件太大（>500MB）', 'error'); return; }
                 recordedBlob = f; // reuse recordedBlob for upload/download/cropping
-                userVideo.srcObject = null; 
-                userVideo.src = URL.createObjectURL(f); 
-                userVideo.muted = false; 
+                userVideo.srcObject = null;
+                userVideo.src = URL.createObjectURL(f);
+                userVideo.muted = false;
                 userVideo.load();
 
-userVideo.addEventListener('loadedmetadata', () => {
-    const wrapper = userVideo.closest('.video-player-wrapper');
-    if (wrapper && userVideo.videoWidth && userVideo.videoHeight) {
-        // ✅ 强制覆盖所有尺寸属性
-        wrapper.style.cssText = `
+                userVideo.addEventListener('loadedmetadata', () => {
+                    const wrapper = userVideo.closest('.video-player-wrapper');
+                    if (wrapper && userVideo.videoWidth && userVideo.videoHeight) {
+                        // ✅ 强制覆盖所有尺寸属性
+                        wrapper.style.cssText = `
             aspect-ratio: ${userVideo.videoWidth} / ${userVideo.videoHeight} !important;
             height: auto !important;
             min-height: unset !important;
             max-height: unset !important;
             width: 100%;
         `;
-        
-        console.log(`✅ 右侧容器已调整:
+
+                        console.log(`✅ 右侧容器已调整:
             视频尺寸: ${userVideo.videoWidth}x${userVideo.videoHeight}
             容器 aspect-ratio: ${userVideo.videoWidth} / ${userVideo.videoHeight}
             容器当前高度: ${wrapper.offsetHeight}px
         `);
-    }
-}, { once: true });
+                    }
+                }, { once: true });
 
-                document.getElementById('downloadRecBtn').disabled = false; 
+                document.getElementById('downloadRecBtn').disabled = false;
                 document.getElementById('uploadRecBtn').disabled = false;
-                
+
                 // ✅ 新增：更新快速操作卡片状态
                 document.getElementById('actionCompare').classList.remove('card-disabled');
                 document.getElementById('actionExport').classList.remove('card-disabled');
                 document.getElementById('actionUpload').classList.remove('card-primary');
-                
+
                 // ✅ 新增：更新 Step 2 的状态为"已完成"
                 const actionRecord = document.getElementById('actionRecord');
                 actionRecord.classList.remove('card-primary');
@@ -1782,7 +1911,7 @@ userVideo.addEventListener('loadedmetadata', () => {
                 } else {
                     recordStatus.textContent = '已完成 ✓';
                 }
-                
+
                 // ✅ 新增：高亮 Step 3（开始对比）
                 const actionCompare = document.getElementById('actionCompare');
                 actionCompare.classList.add('card-primary');
@@ -1790,135 +1919,135 @@ userVideo.addEventListener('loadedmetadata', () => {
                 if (compareStatus) {
                     compareStatus.textContent = '可以开始 →';
                 }
-                
+
                 showMessage('本地视频已加载，可用于对比/裁剪', 'success', 2000);
                 // open crop panel optionally
-                setTimeout(()=> openCropPanel(), 200);
+                setTimeout(() => openCropPanel(), 200);
             });
         }
 
         // ✅ 新增：初始化云端视频选择
-function initCloudSelect() {
-    const selectBtn = document.getElementById('selectCloudBtn');
-    const modal = document.getElementById('cloudSelectModal');
-    const closeBtn = document.getElementById('cloudSelectClose');
-    const listEl = document.getElementById('cloudVideoList');
+        function initCloudSelect() {
+            const selectBtn = document.getElementById('selectCloudBtn');
+            const modal = document.getElementById('cloudSelectModal');
+            const closeBtn = document.getElementById('cloudSelectClose');
+            const listEl = document.getElementById('cloudVideoList');
 
-    selectBtn.addEventListener('click', async () => {
-        modal.classList.remove('hidden');
-        modal.setAttribute('aria-hidden', 'false');
-        
-        try {
-            listEl.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>加载中...</p></div>';
-            const videos = await DanceMirrorAPI.getVideos();
-            
-            if (videos && videos.length) {
-                listEl.innerHTML = '';
-                videos.forEach(video => {
-                    const item = document.createElement('div');
-                    item.className = 'cloud-video-item';
-                    item.innerHTML = `
+            selectBtn.addEventListener('click', async () => {
+                modal.classList.remove('hidden');
+                modal.setAttribute('aria-hidden', 'false');
+
+                try {
+                    listEl.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>加载中...</p></div>';
+                    const videos = await DanceMirrorAPI.getVideos();
+
+                    if (videos && videos.length) {
+                        listEl.innerHTML = '';
+                        videos.forEach(video => {
+                            const item = document.createElement('div');
+                            item.className = 'cloud-video-item';
+                            item.innerHTML = `
                         <h4>${Utils.escapeHtml(video.title)}</h4>
                         <p>${Utils.escapeHtml(video.description || '暂无描述')}</p>
                         <p style="font-size:11px;color:#999;margin-top:4px;">${Utils.formatDate(video.createdAt)}</p>
                     `;
-                    item.onclick = () => selectCloudVideo(video);
-                    listEl.appendChild(item);
-                });
-            } else {
-                listEl.innerHTML = '<p style="text-align:center;color:#666;padding:20px;">暂无视频</p>';
+                            item.onclick = () => selectCloudVideo(video);
+                            listEl.appendChild(item);
+                        });
+                    } else {
+                        listEl.innerHTML = '<p style="text-align:center;color:#666;padding:20px;">暂无视频</p>';
+                    }
+                } catch (err) {
+                    console.error(err);
+                    listEl.innerHTML = '<p style="text-align:center;color:#f44;padding:20px;">加载失败</p>';
+                }
+            });
+
+            closeBtn.addEventListener('click', () => {
+                modal.classList.add('hidden');
+                modal.setAttribute('aria-hidden', 'true');
+            });
+        }
+
+        // ✅ 新增：选择云端视频
+        function selectCloudVideo(video) {
+            let videoPath = video.filePath || '';
+            if (!videoPath) {
+                showMessage('视频路径缺失', 'error');
+                return;
             }
-        } catch (err) {
-            console.error(err);
-            listEl.innerHTML = '<p style="text-align:center;color:#f44;padding:20px;">加载失败</p>';
-        }
-    });
 
-    closeBtn.addEventListener('click', () => {
-        modal.classList.add('hidden');
-        modal.setAttribute('aria-hidden', 'true');
-    });
-}
+            if (!/^https?:\/\//.test(videoPath)) {
+                videoPath = videoPath.replace(/^\/?app\//, '/');
+                videoPath = videoPath.replace(/^\/?uploads\//, '/uploads/');
+                videoPath = videoPath.replace(/^\/?static\//, '/static/');
+                if (!videoPath.startsWith('/')) {
+                    videoPath = '/' + videoPath.replace(/^\/+/, '');
+                }
+            }
 
-// ✅ 新增：选择云端视频
-function selectCloudVideo(video) {
-    let videoPath = video.filePath || '';
-    if (!videoPath) {
-        showMessage('视频路径缺失', 'error');
-        return;
-    }
-    
-    if (!/^https?:\/\//.test(videoPath)) {
-        videoPath = videoPath.replace(/^\/?app\//, '/');
-        videoPath = videoPath.replace(/^\/?uploads\//, '/uploads/');
-        videoPath = videoPath.replace(/^\/?static\//, '/static/');
-        if (!videoPath.startsWith('/')) {
-            videoPath = '/' + videoPath.replace(/^\/+/, '');
-        }
-    }
+            userVideo.srcObject = null;
+            userVideo.src = videoPath;
+            userVideo.muted = false;
+            userVideo.load();
 
-    userVideo.srcObject = null;
-    userVideo.src = videoPath;
-    userVideo.muted = false;
-    userVideo.load();
-
-    userVideo.addEventListener('loadedmetadata', () => {
-        const wrapper = userVideo.closest('.video-player-wrapper');
-        if (wrapper && userVideo.videoWidth && userVideo.videoHeight) {
-            wrapper.style.cssText = `
+            userVideo.addEventListener('loadedmetadata', () => {
+                const wrapper = userVideo.closest('.video-player-wrapper');
+                if (wrapper && userVideo.videoWidth && userVideo.videoHeight) {
+                    wrapper.style.cssText = `
                 aspect-ratio: ${userVideo.videoWidth} / ${userVideo.videoHeight} !important;
                 height: auto !important;
                 min-height: unset !important;
                 max-height: unset !important;
                 width: 100%;
             `;
+                }
+            }, { once: true });
+
+            document.getElementById('downloadRecBtn').disabled = false;
+            document.getElementById('uploadRecBtn').disabled = false;
+            document.getElementById('actionCompare').classList.remove('card-disabled');
+            document.getElementById('actionExport').classList.remove('card-disabled');
+
+            const actionRecord = document.getElementById('actionRecord');
+            actionRecord.classList.remove('card-primary');
+            const recordStatus = actionRecord.querySelector('.card-status');
+            if (!recordStatus) {
+                const statusDiv = document.createElement('div');
+                statusDiv.className = 'card-status';
+                statusDiv.textContent = '已完成 ✓';
+                actionRecord.appendChild(statusDiv);
+            } else {
+                recordStatus.textContent = '已完成 ✓';
+            }
+
+            const actionCompare = document.getElementById('actionCompare');
+            actionCompare.classList.add('card-primary');
+            const compareStatus = actionCompare.querySelector('.card-status');
+            if (compareStatus) {
+                compareStatus.textContent = '可以开始 →';
+            }
+
+            document.getElementById('cloudSelectModal').classList.add('hidden');
+            document.getElementById('cloudSelectModal').setAttribute('aria-hidden', 'true');
+
+            showMessage(`✅ 已选择云端视频: ${video.title}`, 'success', 2000);
         }
-    }, { once: true });
-
-    document.getElementById('downloadRecBtn').disabled = false;
-    document.getElementById('uploadRecBtn').disabled = false;
-    document.getElementById('actionCompare').classList.remove('card-disabled');
-    document.getElementById('actionExport').classList.remove('card-disabled');
-
-    const actionRecord = document.getElementById('actionRecord');
-    actionRecord.classList.remove('card-primary');
-    const recordStatus = actionRecord.querySelector('.card-status');
-    if (!recordStatus) {
-        const statusDiv = document.createElement('div');
-        statusDiv.className = 'card-status';
-        statusDiv.textContent = '已完成 ✓';
-        actionRecord.appendChild(statusDiv);
-    } else {
-        recordStatus.textContent = '已完成 ✓';
-    }
-
-    const actionCompare = document.getElementById('actionCompare');
-    actionCompare.classList.add('card-primary');
-    const compareStatus = actionCompare.querySelector('.card-status');
-    if (compareStatus) {
-        compareStatus.textContent = '可以开始 →';
-    }
-
-    document.getElementById('cloudSelectModal').classList.add('hidden');
-    document.getElementById('cloudSelectModal').setAttribute('aria-hidden', 'true');
-
-    showMessage(`✅ 已选择云端视频: ${video.title}`, 'success', 2000);
-}
 
         // ---------- misc controls ----------
-        function initMiscControls(){
+        function initMiscControls() {
             // 播放速度控制
-            document.querySelectorAll('.speed-buttons .btn').forEach(b => b.addEventListener('click', (e)=> {
+            document.querySelectorAll('.speed-buttons .btn').forEach(b => b.addEventListener('click', (e) => {
                 const s = parseFloat(b.dataset.speed || 1.0);
-                
+
                 // ✅ 智能判断：控制当前模式下的视频
                 const activeVideo = isSingleMode ? singleVideo : originalVideo;
                 if (activeVideo) activeVideo.playbackRate = s;
-                
+
                 // 在对照模式下，同时控制 userVideo
                 if (!isSingleMode && userVideo) userVideo.playbackRate = s;
 
-                document.querySelectorAll('.speed-buttons .btn').forEach(x=>x.classList.remove('active'));
+                document.querySelectorAll('.speed-buttons .btn').forEach(x => x.classList.remove('active'));
                 b.classList.add('active');
                 const speedIndicator = document.getElementById('currentSpeed');
                 if (speedIndicator) speedIndicator.textContent = s + 'x';
@@ -1926,9 +2055,9 @@ function selectCloudVideo(video) {
             }));
 
             // 镜面翻转控制
-            document.getElementById('mirrorUser').addEventListener('click', ()=> toggleMirror('user'));
-            document.getElementById('mirrorOriginal').addEventListener('click', ()=> toggleMirror('original'));
-            
+            document.getElementById('mirrorUser').addEventListener('click', () => toggleMirror('user'));
+            document.getElementById('mirrorOriginal').addEventListener('click', () => toggleMirror('original'));
+
             // AB 循环控制
             document.getElementById('setA').addEventListener('click', setPointA);
             document.getElementById('setB').addEventListener('click', setPointB);
@@ -1936,14 +2065,14 @@ function selectCloudVideo(video) {
             document.getElementById('clearLoop').addEventListener('click', clearABLoop);
         }
 
-  
 
-        function toggleMirror(target){
+
+        function toggleMirror(target) {
             // ✅ 智能判断：如果目标是 original，但在单视频模式下，则翻转 singleVideo
-            const videoToMirror = (target === 'original' && isSingleMode) 
-                                  ? singleVideo 
-                                  : (target === 'original' ? originalVideo : userVideo);
-            
+            const videoToMirror = (target === 'original' && isSingleMode)
+                ? singleVideo
+                : (target === 'original' ? originalVideo : userVideo);
+
             if (videoToMirror) {
                 videoToMirror.classList.toggle('mirrored');
                 let targetName = '视频';
@@ -1972,308 +2101,308 @@ function selectCloudVideo(video) {
             showMessage('B 点已设置: ' + Utils.formatTime(pointB), 'success');
         }
 
-        function startABLoop(){
-            if (pointA === null || pointB === null) { showMessage('请先设置 A/B 点','error'); return; }
-            if (pointA >= pointB) { showMessage('A 点必须小于 B 点','error'); return; }
+        function startABLoop() {
+            if (pointA === null || pointB === null) { showMessage('请先设置 A/B 点', 'error'); return; }
+            if (pointA >= pointB) { showMessage('A 点必须小于 B 点', 'error'); return; }
 
             clearABLoop(); // 清除旧的循环设置
 
             // ✅ 智能判断：控制当前激活的视频
             const activeVideo = isSingleMode ? singleVideo : originalVideo;
             if (!activeVideo) return;
-            
+
             activeVideo.currentTime = pointA;
-            activeVideo.play().catch(()=>{});
+            activeVideo.play().catch(() => { });
 
             abLoopVideo.addEventListener('timeupdate', handleABLoop);
             abLoopActive = true;
-            
+
             showMessage('AB 循环已开始', 'success', 1200);
         }
-        function handleABLoop(){
+        function handleABLoop() {
             if (!abLoopActive || pointA === null || pointB === null) return;
             const video = e.target; // ✅ 修复：显式接收事件参数
-            if (video.currentTime >= pointB){
+            if (video.currentTime >= pointB) {
                 video.currentTime = pointA;
                 // 如果视频暂停了，强制继续播放
-                if (video.paused) video.play().catch(()=>{});
+                if (video.paused) video.play().catch(() => { });
             }
         }
 
-        function detachABListener(){
+        function detachABListener() {
             if (abLoopVideo) {
                 abLoopVideo.removeEventListener('timeupdate', handleABLoop);
             }
             abLoopVideo = null;
             abLoopActive = false;
-        }  
+        }
 
-        function clearABLoop(){
+        function clearABLoop() {
             pointA = pointB = null;
             detachABListener();
             pointA = null;
             pointB = null;
             updateABInfo();
-            showMessage('已清除 AB 循环','success',1000);
+            showMessage('已清除 AB 循环', 'success', 1000);
         }
 
-        function updateABInfo(){ 
-            document.getElementById('abInfo').textContent = 'A: ' + (pointA!==null?Utils.formatTime(pointA):'未设置') + ' | B: ' + (pointB!==null?Utils.formatTime(pointB):'未设置'); 
+        function updateABInfo() {
+            document.getElementById('abInfo').textContent = 'A: ' + (pointA !== null ? Utils.formatTime(pointA) : '未设置') + ' | B: ' + (pointB !== null ? Utils.formatTime(pointB) : '未设置');
         }
 
-                function reattachABLoopAfterModeSwitch(){
-            if (abLoopActive && pointA !== null && pointB !== null){
+        function reattachABLoopAfterModeSwitch() {
+            if (abLoopActive && pointA !== null && pointB !== null) {
                 detachABListener();
                 abLoopVideo = isSingleMode ? singleVideo : originalVideo;
-                if (abLoopVideo){
+                if (abLoopVideo) {
                     abLoopVideo.addEventListener('timeupdate', handleABLoop);
                 }
             }
         }
 
-// ---------- cropper (canvas-based, exports PNG frame) ----------
-class VideoCropper {
-    constructor(videoEl, canvasEl){
-        this.video = videoEl;
-        this.canvas = canvasEl;
-        this.ctx = canvasEl.getContext('2d');
-        this.crop = null;
-        this.raf = null;
-        
-        // 交互状态
-        this.isDragging = false;
-        this.dragStart = {x:0, y:0};
-        this.initialCrop = null;
-        this.action = 'none'; // 'move' (移动) 或 'create' (新建)
+        // ---------- cropper (canvas-based, exports PNG frame) ----------
+        class VideoCropper {
+            constructor(videoEl, canvasEl) {
+                this.video = videoEl;
+                this.canvas = canvasEl;
+                this.ctx = canvasEl.getContext('2d');
+                this.crop = null;
+                this.raf = null;
 
-        // 绑定 this 防止丢失
-        this._onMouseDown = this.onMouseDown.bind(this);
-        this._onMouseMove = this.onMouseMove.bind(this);
-        this._onMouseUp = this.onMouseUp.bind(this);
-    }
+                // 交互状态
+                this.isDragging = false;
+                this.dragStart = { x: 0, y: 0 };
+                this.initialCrop = null;
+                this.action = 'none'; // 'move' (移动) 或 'create' (新建)
 
-    init(){
-        // ✅ 等待视频元数据加载完成
-        if (this.video.readyState >= 1) {
-            this.resizeCanvas();
-        } else {
-            this.video.addEventListener('loadedmetadata', () => {
-                this.resizeCanvas();
-            }, { once: true });
-        }
-        
-        window.addEventListener('resize', ()=> this.resizeCanvas());
-        this.initRatioButtons();
-        
-        // ✅ 绑定鼠标/触摸事件
-        this.canvas.addEventListener('mousedown', this._onMouseDown);
-        window.addEventListener('mousemove', this._onMouseMove);
-        window.addEventListener('mouseup', this._onMouseUp);
-        
-        // 简单的触摸支持
-        this.canvas.addEventListener('touchstart', (e)=> {
-            e.preventDefault();
-            const t = e.touches[0];
-            this.onMouseDown({ clientX: t.clientX, clientY: t.clientY });
-        }, {passive: false});
-        window.addEventListener('touchmove', (e)=> {
-            if(this.isDragging) e.preventDefault();
-            const t = e.touches[0];
-            this.onMouseMove({ clientX: t.clientX, clientY: t.clientY });
-        }, {passive: false});
-        window.addEventListener('touchend', ()=> this.onMouseUp());
+                // 绑定 this 防止丢失
+                this._onMouseDown = this.onMouseDown.bind(this);
+                this._onMouseMove = this.onMouseMove.bind(this);
+                this._onMouseUp = this.onMouseUp.bind(this);
+            }
 
-        this.drawLoop();
-    }
+            init() {
+                // ✅ 等待视频元数据加载完成
+                if (this.video.readyState >= 1) {
+                    this.resizeCanvas();
+                } else {
+                    this.video.addEventListener('loadedmetadata', () => {
+                        this.resizeCanvas();
+                    }, { once: true });
+                }
 
-    resizeCanvas(){
-        const videoWidth = this.video.videoWidth || 1280;
-        const videoHeight = this.video.videoHeight || 720;
-        const videoAspect = videoWidth / videoHeight;
-        
-        const rect = this.canvas.getBoundingClientRect();
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
-        
-        this.canvas.width = Math.max(320, Math.round(rect.width * dpr));
-        this.canvas.height = Math.round(this.canvas.width / videoAspect);
-        
-        const maxHeight = Math.round(rect.height * dpr);
-        if (this.canvas.height > maxHeight) {
-            this.canvas.height = maxHeight;
-            this.canvas.width = Math.round(this.canvas.height * videoAspect);
-        }
-        
-        // 如果没有裁剪框，默认给一个 16:9
-        if (!this.crop) this.setRatio('16:9');
-    }
+                window.addEventListener('resize', () => this.resizeCanvas());
+                this.initRatioButtons();
 
-    initRatioButtons(){
-        document.querySelectorAll('.ratio-btn').forEach(b => b.addEventListener('click', (e)=>{
-            document.querySelectorAll('.ratio-btn').forEach(x=>x.classList.remove('active'));
-            b.classList.add('active');
-            this.setRatio(b.dataset.ratio);
-        }));
-    }
+                // ✅ 绑定鼠标/触摸事件
+                this.canvas.addEventListener('mousedown', this._onMouseDown);
+                window.addEventListener('mousemove', this._onMouseMove);
+                window.addEventListener('mouseup', this._onMouseUp);
 
-    setRatio(r){
-        // 如果是自定义，不重置框，只激活按钮状态
-        if (r === 'custom') return;
+                // 简单的触摸支持
+                this.canvas.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    const t = e.touches[0];
+                    this.onMouseDown({ clientX: t.clientX, clientY: t.clientY });
+                }, { passive: false });
+                window.addEventListener('touchmove', (e) => {
+                    if (this.isDragging) e.preventDefault();
+                    const t = e.touches[0];
+                    this.onMouseMove({ clientX: t.clientX, clientY: t.clientY });
+                }, { passive: false });
+                window.addEventListener('touchend', () => this.onMouseUp());
 
-        const [rw, rh] = r.split(':').map(Number);
-        const w = this.canvas.width, h = this.canvas.height;
-        // 计算最大适配尺寸
-        const scale = Math.min(w / rw, h / rh) * 0.8; // 0.8 让它默认稍微小一点，留出边距
-        const cw = Math.round(rw * scale), ch = Math.round(rh * scale);
-        this.crop = { x: Math.round((w - cw)/2), y: Math.round((h - ch)/2), w: cw, h: ch };
-    }
+                this.drawLoop();
+            }
 
-    // --- 交互逻辑 ---
+            resizeCanvas() {
+                const videoWidth = this.video.videoWidth || 1280;
+                const videoHeight = this.video.videoHeight || 720;
+                const videoAspect = videoWidth / videoHeight;
 
-    getMousePos(e) {
-        const rect = this.canvas.getBoundingClientRect();
-        return {
-            x: (e.clientX - rect.left) * (this.canvas.width / rect.width),
-            y: (e.clientY - rect.top) * (this.canvas.height / rect.height)
-        };
-    }
+                const rect = this.canvas.getBoundingClientRect();
+                const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-    onMouseDown(e) {
-        const pos = this.getMousePos(e);
-        this.isDragging = true;
-        this.dragStart = pos;
+                this.canvas.width = Math.max(320, Math.round(rect.width * dpr));
+                this.canvas.height = Math.round(this.canvas.width / videoAspect);
 
-        // 判断点击位置：是在现有框内（移动），还是框外（新建）
-        if (this.crop && 
-            pos.x >= this.crop.x && pos.x <= this.crop.x + this.crop.w &&
-            pos.y >= this.crop.y && pos.y <= this.crop.y + this.crop.h) {
-            this.action = 'move';
-            this.initialCrop = { ...this.crop };
-        } else {
-            this.action = 'create';
-            this.crop = { x: pos.x, y: pos.y, w: 0, h: 0 };
-            // 切换到自定义模式
-            document.querySelectorAll('.ratio-btn').forEach(b => b.classList.remove('active'));
-            document.querySelector('.ratio-btn[data-ratio="custom"]')?.classList.add('active');
-        }
-    }
+                const maxHeight = Math.round(rect.height * dpr);
+                if (this.canvas.height > maxHeight) {
+                    this.canvas.height = maxHeight;
+                    this.canvas.width = Math.round(this.canvas.height * videoAspect);
+                }
 
-    onMouseMove(e) {
-        if (!this.isDragging) return;
-        const pos = this.getMousePos(e);
+                // 如果没有裁剪框，默认给一个 16:9
+                if (!this.crop) this.setRatio('16:9');
+            }
 
-        if (this.action === 'move') {
-            const dx = pos.x - this.dragStart.x;
-            const dy = pos.y - this.dragStart.y;
-            
-            let newX = this.initialCrop.x + dx;
-            let newY = this.initialCrop.y + dy;
+            initRatioButtons() {
+                document.querySelectorAll('.ratio-btn').forEach(b => b.addEventListener('click', (e) => {
+                    document.querySelectorAll('.ratio-btn').forEach(x => x.classList.remove('active'));
+                    b.classList.add('active');
+                    this.setRatio(b.dataset.ratio);
+                }));
+            }
 
-            // 边界限制
-            newX = Math.max(0, Math.min(newX, this.canvas.width - this.initialCrop.w));
-            newY = Math.max(0, Math.min(newY, this.canvas.height - this.initialCrop.h));
+            setRatio(r) {
+                // 如果是自定义，不重置框，只激活按钮状态
+                if (r === 'custom') return;
 
-            this.crop.x = newX;
-            this.crop.y = newY;
-        } else if (this.action === 'create') {
-            this.crop.w = pos.x - this.dragStart.x;
-            this.crop.h = pos.y - this.dragStart.y;
-        }
-    }
+                const [rw, rh] = r.split(':').map(Number);
+                const w = this.canvas.width, h = this.canvas.height;
+                // 计算最大适配尺寸
+                const scale = Math.min(w / rw, h / rh) * 0.8; // 0.8 让它默认稍微小一点，留出边距
+                const cw = Math.round(rw * scale), ch = Math.round(rh * scale);
+                this.crop = { x: Math.round((w - cw) / 2), y: Math.round((h - ch) / 2), w: cw, h: ch };
+            }
 
-    onMouseUp(e) {
-        if (!this.isDragging) return;
-        this.isDragging = false;
-        
-        // 处理负宽高（从右下往左上拉的情况）
-        if (this.crop.w < 0) {
-            this.crop.x += this.crop.w;
-            this.crop.w = Math.abs(this.crop.w);
-        }
-        if (this.crop.h < 0) {
-            this.crop.y += this.crop.h;
-            this.crop.h = Math.abs(this.crop.h);
-        }
-        
-        // 防止框太小
-        if (this.crop.w < 10 || this.crop.h < 10) {
-            if (this.action === 'create') this.setRatio('16:9'); // 如果画得太小，恢复默认
-        }
-    }
+            // --- 交互逻辑 ---
 
-    drawLoop(){
-        if (this.video && this.video.readyState >= 2) {
-            this.ctx.clearRect(0,0,this.canvas.width,this.canvas.height);
-            this.ctx.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
-            
-            // 绘制遮罩层（让非裁剪区域变暗）
-            this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            getMousePos(e) {
+                const rect = this.canvas.getBoundingClientRect();
+                return {
+                    x: (e.clientX - rect.left) * (this.canvas.width / rect.width),
+                    y: (e.clientY - rect.top) * (this.canvas.height / rect.height)
+                };
+            }
 
-            if (this.crop) {
-                // 清除裁剪区域的遮罩，显示原图
-                // 这里用个小技巧：重绘裁剪区域的图像
-                this.ctx.drawImage(this.video, 
-                    this.crop.x * (this.video.videoWidth / this.canvas.width), 
-                    this.crop.y * (this.video.videoHeight / this.canvas.height),
-                    this.crop.w * (this.video.videoWidth / this.canvas.width),
-                    this.crop.h * (this.video.videoHeight / this.canvas.height),
-                    this.crop.x, this.crop.y, this.crop.w, this.crop.h
-                );
+            onMouseDown(e) {
+                const pos = this.getMousePos(e);
+                this.isDragging = true;
+                this.dragStart = pos;
 
-                // 绘制边框
-                this.ctx.strokeStyle = '#00bfff'; 
-                this.ctx.lineWidth = 2;
-                this.ctx.strokeRect(this.crop.x, this.crop.y, this.crop.w, this.crop.h);
-                
-                // 绘制九宫格辅助线
-                this.ctx.beginPath();
-                this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-                this.ctx.lineWidth = 1;
-                // 竖线
-                this.ctx.moveTo(this.crop.x + this.crop.w/3, this.crop.y);
-                this.ctx.lineTo(this.crop.x + this.crop.w/3, this.crop.y + this.crop.h);
-                this.ctx.moveTo(this.crop.x + 2*this.crop.w/3, this.crop.y);
-                this.ctx.lineTo(this.crop.x + 2*this.crop.w/3, this.crop.y + this.crop.h);
-                // 横线
-                this.ctx.moveTo(this.crop.x, this.crop.y + this.crop.h/3);
-                this.ctx.lineTo(this.crop.x + this.crop.w, this.crop.y + this.crop.h/3);
-                this.ctx.moveTo(this.crop.x, this.crop.y + 2*this.crop.h/3);
-                this.ctx.lineTo(this.crop.x + this.crop.w, this.crop.y + 2*this.crop.h/3);
-                this.ctx.stroke();
+                // 判断点击位置：是在现有框内（移动），还是框外（新建）
+                if (this.crop &&
+                    pos.x >= this.crop.x && pos.x <= this.crop.x + this.crop.w &&
+                    pos.y >= this.crop.y && pos.y <= this.crop.y + this.crop.h) {
+                    this.action = 'move';
+                    this.initialCrop = { ...this.crop };
+                } else {
+                    this.action = 'create';
+                    this.crop = { x: pos.x, y: pos.y, w: 0, h: 0 };
+                    // 切换到自定义模式
+                    document.querySelectorAll('.ratio-btn').forEach(b => b.classList.remove('active'));
+                    document.querySelector('.ratio-btn[data-ratio="custom"]')?.classList.add('active');
+                }
+            }
+
+            onMouseMove(e) {
+                if (!this.isDragging) return;
+                const pos = this.getMousePos(e);
+
+                if (this.action === 'move') {
+                    const dx = pos.x - this.dragStart.x;
+                    const dy = pos.y - this.dragStart.y;
+
+                    let newX = this.initialCrop.x + dx;
+                    let newY = this.initialCrop.y + dy;
+
+                    // 边界限制
+                    newX = Math.max(0, Math.min(newX, this.canvas.width - this.initialCrop.w));
+                    newY = Math.max(0, Math.min(newY, this.canvas.height - this.initialCrop.h));
+
+                    this.crop.x = newX;
+                    this.crop.y = newY;
+                } else if (this.action === 'create') {
+                    this.crop.w = pos.x - this.dragStart.x;
+                    this.crop.h = pos.y - this.dragStart.y;
+                }
+            }
+
+            onMouseUp(e) {
+                if (!this.isDragging) return;
+                this.isDragging = false;
+
+                // 处理负宽高（从右下往左上拉的情况）
+                if (this.crop.w < 0) {
+                    this.crop.x += this.crop.w;
+                    this.crop.w = Math.abs(this.crop.w);
+                }
+                if (this.crop.h < 0) {
+                    this.crop.y += this.crop.h;
+                    this.crop.h = Math.abs(this.crop.h);
+                }
+
+                // 防止框太小
+                if (this.crop.w < 10 || this.crop.h < 10) {
+                    if (this.action === 'create') this.setRatio('16:9'); // 如果画得太小，恢复默认
+                }
+            }
+
+            drawLoop() {
+                if (this.video && this.video.readyState >= 2) {
+                    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                    this.ctx.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
+
+                    // 绘制遮罩层（让非裁剪区域变暗）
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+                    if (this.crop) {
+                        // 清除裁剪区域的遮罩，显示原图
+                        // 这里用个小技巧：重绘裁剪区域的图像
+                        this.ctx.drawImage(this.video,
+                            this.crop.x * (this.video.videoWidth / this.canvas.width),
+                            this.crop.y * (this.video.videoHeight / this.canvas.height),
+                            this.crop.w * (this.video.videoWidth / this.canvas.width),
+                            this.crop.h * (this.video.videoHeight / this.canvas.height),
+                            this.crop.x, this.crop.y, this.crop.w, this.crop.h
+                        );
+
+                        // 绘制边框
+                        this.ctx.strokeStyle = '#00bfff';
+                        this.ctx.lineWidth = 2;
+                        this.ctx.strokeRect(this.crop.x, this.crop.y, this.crop.w, this.crop.h);
+
+                        // 绘制九宫格辅助线
+                        this.ctx.beginPath();
+                        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                        this.ctx.lineWidth = 1;
+                        // 竖线
+                        this.ctx.moveTo(this.crop.x + this.crop.w / 3, this.crop.y);
+                        this.ctx.lineTo(this.crop.x + this.crop.w / 3, this.crop.y + this.crop.h);
+                        this.ctx.moveTo(this.crop.x + 2 * this.crop.w / 3, this.crop.y);
+                        this.ctx.lineTo(this.crop.x + 2 * this.crop.w / 3, this.crop.y + this.crop.h);
+                        // 横线
+                        this.ctx.moveTo(this.crop.x, this.crop.y + this.crop.h / 3);
+                        this.ctx.lineTo(this.crop.x + this.crop.w, this.crop.y + this.crop.h / 3);
+                        this.ctx.moveTo(this.crop.x, this.crop.y + 2 * this.crop.h / 3);
+                        this.ctx.lineTo(this.crop.x + this.crop.w, this.crop.y + 2 * this.crop.h / 3);
+                        this.ctx.stroke();
+                    }
+                }
+                this.raf = requestAnimationFrame(() => this.drawLoop());
+            }
+
+            async exportCroppedImageBlob() {
+                if (!this.crop) return null;
+                const tmp = document.createElement('canvas');
+                tmp.width = this.crop.w; tmp.height = this.crop.h;
+                tmp.getContext('2d').drawImage(this.canvas, this.crop.x, this.crop.y, this.crop.w, this.crop.h, 0, 0, this.crop.w, this.crop.h);
+                return new Promise(resolve => tmp.toBlob(resolve, 'image/png'));
+            }
+
+            destroy() {
+                cancelAnimationFrame(this.raf);
+                window.removeEventListener('resize', () => { });
+                this.canvas.removeEventListener('mousedown', this._onMouseDown);
+                window.removeEventListener('mousemove', this._onMouseMove);
+                window.removeEventListener('mouseup', this._onMouseUp);
             }
         }
-        this.raf = requestAnimationFrame(()=> this.drawLoop());
-    }
+        // ...existing code...
 
-    async exportCroppedImageBlob(){
-        if (!this.crop) return null;
-        const tmp = document.createElement('canvas');
-        tmp.width = this.crop.w; tmp.height = this.crop.h;
-        tmp.getContext('2d').drawImage(this.canvas, this.crop.x, this.crop.y, this.crop.w, this.crop.h, 0, 0, this.crop.w, this.crop.h);
-        return new Promise(resolve => tmp.toBlob(resolve, 'image/png'));
-    }
-
-    destroy(){ 
-        cancelAnimationFrame(this.raf); 
-        window.removeEventListener('resize', ()=>{}); 
-        this.canvas.removeEventListener('mousedown', this._onMouseDown);
-        window.removeEventListener('mousemove', this._onMouseMove);
-        window.removeEventListener('mouseup', this._onMouseUp);
-    }
-}
-// ...existing code...
-
-        function openCropPanel(){
+        function openCropPanel() {
             // require a video source (recorded or loaded) before opening the crop panel
             if (!(typeof recordedBlob !== 'undefined' && recordedBlob) && !(window.userVideo && userVideo.src)) {
                 if (typeof showMessage === 'function') showMessage('请先录制或加载本地视频，再打开裁剪面板', 'error');
                 return;
             }
-            cropPanel.classList.remove('hidden'); cropPanel.setAttribute('aria-hidden','false');
+            cropPanel.classList.remove('hidden'); cropPanel.setAttribute('aria-hidden', 'false');
             // ensure video shown in userVideo is playing for frame capture
             userVideo.pause(); userVideo.currentTime = Math.min(userVideo.duration || 0, 0);
-            setTimeout(()=> {
-                userVideo.play().catch(()=>{});
+            setTimeout(() => {
+                userVideo.play().catch(() => { });
                 if (activeCropper) activeCropper.destroy();
                 activeCropper = new VideoCropper(userVideo, cropCanvas);
                 activeCropper.init();
@@ -2281,363 +2410,365 @@ class VideoCropper {
         }
 
 
-        document.getElementById('cancelCropBtn').addEventListener('click', ()=> closeCropPanel());
-        document.getElementById('cropClose').addEventListener('click', ()=> closeCropPanel());
+        document.getElementById('cancelCropBtn').addEventListener('click', () => closeCropPanel());
+        document.getElementById('cropClose').addEventListener('click', () => closeCropPanel());
 
-        function closeCropPanel(){
-            cropPanel.classList.add('hidden'); cropPanel.setAttribute('aria-hidden','true');
+        function closeCropPanel() {
+            cropPanel.classList.add('hidden'); cropPanel.setAttribute('aria-hidden', 'true');
             if (activeCropper) { activeCropper.destroy(); activeCropper = null; }
-            try { userVideo.pause(); } catch(e){}
+            try { userVideo.pause(); } catch (e) { }
         }
     </script>
-    
+
     <!-- ✅ 恢复工作版本的 FFmpeg 实现 (0.11.x) -->
     <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
     <script>
-    const FFmpegWASM = (function(){
-      let ffmpeg = null, loaded = false;
-      let _logs = [];
-      function pushLog(line){
-        _logs.push(String(line));
-        if(_logs.length>200) _logs.shift();
-      }
-      return {
-        ensure: async function({log=false}={}){
-          if (loaded && ffmpeg) return ffmpeg;
-          if (!window.FFmpeg) throw new Error('FFmpeg not found');
-          const { createFFmpeg, fetchFile } = FFmpeg;
-          ffmpeg = createFFmpeg({ log });
-          try{
-            ffmpeg.setLogger && ffmpeg.setLogger(({type, message})=>{ pushLog(type+': '+message); });
-          }catch(e){}
-          await ffmpeg.load();
-          ffmpeg._fetchFile = fetchFile;
-          loaded = true; 
-          return ffmpeg;
-        },
-        get: () => ffmpeg,
-        getRecentLogs: () => _logs.join('\n')
-      };
-    })();
+        const FFmpegWASM = (function () {
+            let ffmpeg = null, loaded = false;
+            let _logs = [];
+            function pushLog(line) {
+                _logs.push(String(line));
+                if (_logs.length > 200) _logs.shift();
+            }
+            return {
+                ensure: async function ({ log = false } = {}) {
+                    if (loaded && ffmpeg) return ffmpeg;
+                    if (!window.FFmpeg) throw new Error('FFmpeg not found');
+                    const { createFFmpeg, fetchFile } = FFmpeg;
+                    ffmpeg = createFFmpeg({ log });
+                    try {
+                        ffmpeg.setLogger && ffmpeg.setLogger(({ type, message }) => { pushLog(type + ': ' + message); });
+                    } catch (e) { }
+                    await ffmpeg.load();
+                    ffmpeg._fetchFile = fetchFile;
+                    loaded = true;
+                    return ffmpeg;
+                },
+                get: () => ffmpeg,
+                getRecentLogs: () => _logs.join('\n')
+            };
+        })();
 
-async function cropAndTranscode(inputBlob, cropParams, opts={}){
-  const format = 'webm';
-  const onProgress = typeof opts.onProgress==='function'?opts.onProgress:()=>{};
-  const ffmpeg = await FFmpegWASM.ensure({ log:false });
-  const fetchFile = ffmpeg._fetchFile;
-  const extIn = (inputBlob.type && inputBlob.type.includes('webm'))? 'webm':'mp4';
-  const inName = 'in.'+extIn; 
-  const outName = 'out.webm';
-  const data = await fetchFile(inputBlob);
-  
-  try{ ffmpeg.FS('unlink', inName); }catch(e){}
-  try{ ffmpeg.FS('unlink', outName); }catch(e){}
-  ffmpeg.FS('writeFile', inName, data);
-  
-  // ✅ 确保裁剪参数是偶数（视频编码要求）
-  const ensureEven = (n) => Math.round(n / 2) * 2;
-  const cropW = ensureEven(cropParams.w);
-  const cropH = ensureEven(cropParams.h);
-  const cropX = ensureEven(cropParams.x);
-  const cropY = ensureEven(cropParams.y);
-  
-  const cropFilter = `crop=${cropW}:${cropH}:${cropX}:${cropY}`;
-  
-  console.log('FFmpeg 裁剪参数:', cropFilter);
-  
-  const args = [
-    '-hide_banner',
-    '-y',
-    '-i', inName,
-    '-vf', cropFilter,
-    '-c:v', 'libvpx',
-    '-crf', '4',
-    '-b:v', '0',
-    '-c:a', 'libvorbis',
-    '-q:a', '8',
-    outName
-  ];
-  
-  ffmpeg.setProgress(({ratio})=>{ try{ onProgress(ratio); }catch(e){} });
-  
-  try{
-    await ffmpeg.run(...args);
-  } catch(runErr){
-    var recent = (FFmpegWASM && FFmpegWASM.getRecentLogs) ? FFmpegWASM.getRecentLogs() : '';
-    var tail = recent.split('\n').slice(-20).join('\n');
-    var msg = 'ffmpeg.run failed: ' + (runErr && runErr.message ? runErr.message : String(runErr));
-    if(tail) msg += '\n--- ffmpeg recent logs ---\n' + tail;
-    throw new Error(msg);
-  }
-  
-  const outData = ffmpeg.FS('readFile', outName);
-  const blob = new Blob([outData.buffer], { type: 'video/webm' });
-  
-  try{ ffmpeg.FS('unlink', inName); }catch(e){}
-  try{ ffmpeg.FS('unlink', outName); }catch(e){}
-  
-  console.log('裁剪后视频尺寸:', cropW, 'x', cropH);
-  
-  return blob;
-}
-  
-// ✅ 新的智能裁剪逻辑：云端优先 -> 本地降级
-(function wireApplyCrop(){
-    const applyBtn = document.getElementById('applyCropBtn');
-    if(!applyBtn) return;
-    
-    applyBtn.type='button';
-    applyBtn.addEventListener('click', async ()=>{
-        const originalText = applyBtn.textContent;
-        applyBtn.disabled = true;
+        async function cropAndTranscode(inputBlob, cropParams, opts = {}) {
+            const format = 'webm';
+            const onProgress = typeof opts.onProgress === 'function' ? opts.onProgress : () => { };
+            const ffmpeg = await FFmpegWASM.ensure({ log: false });
+            const fetchFile = ffmpeg._fetchFile;
+            const extIn = (inputBlob.type && inputBlob.type.includes('webm')) ? 'webm' : 'mp4';
+            const inName = 'in.' + extIn;
+            const outName = 'out.webm';
+            const data = await fetchFile(inputBlob);
 
-        let videoId = (window.selectedVideo?.id) || window.currentVideoId || null;
-        let videoInfo = null;
+            try { ffmpeg.FS('unlink', inName); } catch (e) { }
+            try { ffmpeg.FS('unlink', outName); } catch (e) { }
+            ffmpeg.FS('writeFile', inName, data);
 
-        // 1. 获取裁剪参数 (通用步骤)
-        if(!activeCropper || !activeCropper.crop) {
-            showMessage('请先选择裁剪区域', 'error');
-            applyBtn.disabled = false;
-            return;
-        }
+            // ✅ 确保裁剪参数是偶数（视频编码要求）
+            const ensureEven = (n) => Math.round(n / 2) * 2;
+            const cropW = ensureEven(cropParams.w);
+            const cropH = ensureEven(cropParams.h);
+            const cropX = ensureEven(cropParams.x);
+            const cropY = ensureEven(cropParams.y);
 
-        // 计算真实坐标
-        const c = activeCropper.crop;
-        const canvas = activeCropper.canvas;
-        const video = activeCropper.video;
-        const videoWidth = video.videoWidth || 1920;
-        const videoHeight = video.videoHeight || 1080;
-        const scaleX = videoWidth / canvas.width;
-        const scaleY = videoHeight / canvas.height;
+            const cropFilter = `crop=${cropW}:${cropH}:${cropX}:${cropY}`;
 
-        const cropParams = { 
-            x: Math.max(0, Math.round(c.x * scaleX)), 
-            y: Math.max(0, Math.round(c.y * scaleY)), 
-            width: Math.max(1, Math.round(c.w * scaleX)), // 后端字段通常叫 width
-            height: Math.max(1, Math.round(c.h * scaleY)), // 后端字段通常叫 height
-            // 保留短字段给本地 WASM 用
-            w: Math.max(1, Math.round(c.w * scaleX)),
-            h: Math.max(1, Math.round(c.h * scaleY))
-        };
+            console.log('FFmpeg 裁剪参数:', cropFilter);
 
-        // ==========================================
-        // 🚀 策略 A: 尝试云端异步处理 (RabbitMQ)
-        // ==========================================
-        try {
-            applyBtn.textContent = '☁️ 1/3 上传原片...';
-            
-            // A1. 确保视频已上传并获取 ID
-            let videoId = currentVideoId;
-            
-            // 如果是 Blob (录制/本地文件)，必须先上传
-            if (typeof recordedBlob !== 'undefined' && recordedBlob) {
-                // ✅ 修复：更稳健的文件构造方式
-                // 1. 确保拿到的是纯 Blob
-                const rawBlob = recordedBlob instanceof Blob ? recordedBlob : new Blob([recordedBlob], {type: 'video/webm'});
-                
-                // 2. 构造一个新的 File 对象，使用安全的文件名
-                // 注意：使用 Date.now() 避免文件名包含特殊字符
-                const fileName = `raw_${Date.now()}.mp4`;
-                const file = new File([rawBlob], fileName, { type: 'video/mp4' });
-                
-                console.log('正在上传原片:', fileName, '大小:', file.size);
+            const args = [
+                '-hide_banner',
+                '-y',
+                '-i', inName,
+                '-vf', cropFilter,
+                '-c:v', 'libvpx',
+                '-crf', '4',
+                '-b:v', '0',
+                '-c:a', 'libvorbis',
+                '-q:a', '8',
+                outName
+            ];
 
-                // ✅ 修复 2: 手动构造请求，绕过 api.js，确保参数完全可控
-                const formData = new FormData();
-                formData.append('video', file);
-                formData.append('title', `raw_crop_${Date.now()}`);
-                formData.append('description', 'auto_crop_upload');
+            ffmpeg.setProgress(({ ratio }) => { try { onProgress(ratio); } catch (e) { } });
 
-                const token = localStorage.getItem('token');
-                // 假设上传接口是 /api/videos (POST)
-                const upRes = await fetch('/api/v1/videos', {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` },
-                    body: formData
-                });
-
-                if (!upRes.ok) {
-                    // 获取详细错误信息
-                    const errText = await upRes.text();
-                    throw new Error(`上传失败 (${upRes.status}): ${errText}`);
-                }
-                
-                const uploadRes = await upRes.json();
-                
-                if (!uploadRes || !uploadRes.id) {
-                    throw new Error("上传响应异常，未获取到 ID");
-                }
-                videoId = uploadRes.id;
+            try {
+                await ffmpeg.run(...args);
+            } catch (runErr) {
+                var recent = (FFmpegWASM && FFmpegWASM.getRecentLogs) ? FFmpegWASM.getRecentLogs() : '';
+                var tail = recent.split('\n').slice(-20).join('\n');
+                var msg = 'ffmpeg.run failed: ' + (runErr && runErr.message ? runErr.message : String(runErr));
+                if (tail) msg += '\n--- ffmpeg recent logs ---\n' + tail;
+                throw new Error(msg);
             }
 
-            if (!videoId) throw new Error("无法获取视频 ID");
+            const outData = ffmpeg.FS('readFile', outName);
+            const blob = new Blob([outData.buffer], { type: 'video/webm' });
 
-            // A2. 提交任务
-            applyBtn.textContent = '☁️ 2/3 提交队列...';
-            await DanceMirrorAPI.cropVideoCloud(videoId, cropParams);
-            
-            showMessage('✅ 任务已提交云端，正在处理...', 'success', 2000);
+            try { ffmpeg.FS('unlink', inName); } catch (e) { }
+            try { ffmpeg.FS('unlink', outName); } catch (e) { }
 
-            // A3. 轮询状态
-            let attempts = 0;
-            const maxAttempts = 60; // ✅ 增加到 60 次 (约 60秒)
-            
-            const pollInterval = setInterval(async () => {
-                attempts++;
+            console.log('裁剪后视频尺寸:', cropW, 'x', cropH);
+
+            return blob;
+        }
+
+        // ✅ 新的智能裁剪逻辑：云端优先 -> 本地降级
+        (function wireApplyCrop() {
+            const applyBtn = document.getElementById('applyCropBtn');
+            if (!applyBtn) return;
+
+            applyBtn.type = 'button';
+            applyBtn.addEventListener('click', async () => {
+                const originalText = applyBtn.textContent;
+                applyBtn.disabled = true;
+
+                let videoId = (window.selectedVideo?.id) || window.currentVideoId || null;
+                let videoInfo = null;
+
+                // 1. 获取裁剪参数 (通用步骤)
+                if (!activeCropper || !activeCropper.crop) {
+                    showMessage('请先选择裁剪区域', 'error');
+                    applyBtn.disabled = false;
+                    return;
+                }
+
+                // 计算真实坐标
+                const c = activeCropper.crop;
+                const canvas = activeCropper.canvas;
+                const video = activeCropper.video;
+                const videoWidth = video.videoWidth || 1920;
+                const videoHeight = video.videoHeight || 1080;
+                const scaleX = videoWidth / canvas.width;
+                const scaleY = videoHeight / canvas.height;
+
+                const cropParams = {
+                    x: Math.max(0, Math.round(c.x * scaleX)),
+                    y: Math.max(0, Math.round(c.y * scaleY)),
+                    width: Math.max(1, Math.round(c.w * scaleX)), // 后端字段通常叫 width
+                    height: Math.max(1, Math.round(c.h * scaleY)), // 后端字段通常叫 height
+                    // 保留短字段给本地 WASM 用
+                    w: Math.max(1, Math.round(c.w * scaleX)),
+                    h: Math.max(1, Math.round(c.h * scaleY))
+                };
+
+                // ==========================================
+                // 🚀 策略 A: 尝试云端异步处理 (RabbitMQ)
+                // ==========================================
                 try {
-                    // 注意：这里要用 /v1
-                    const statusRes = await DanceMirrorAPI.getVideoStatus(videoId);
-                    console.log('Cloud status:', statusRes.status);
+                    applyBtn.textContent = '☁️ 1/3 上传原片...';
 
-                    if (statusRes.status === 'completed') {
-                        clearInterval(pollInterval);
-                        showMessage('✅ 云端裁剪完成！', 'success');
-                        
-    // 获取裁剪后视频详情
-    const v = await DanceMirrorAPI.getVideo(videoId);
+                    // A1. 确保视频已上传并获取 ID
+                    let videoId = currentVideoId;
 
-    if (v?.filePath && userVideo) {
-        userVideo.src = v.filePath;
-        userVideo.load();
-        userVideo.play().catch(() => {});
-    }
-                        
-                        closeCropPanel();
-                        applyBtn.disabled = false;
-                        applyBtn.textContent = originalText;
-                    } else if (statusRes.status === 'failed') {
-                        clearInterval(pollInterval);
-                        throw new Error("云端处理报错");
-                    } else if (attempts >= maxAttempts) {
-                        clearInterval(pollInterval);
-                        throw new Error("云端处理超时 (60s)");
+                    // 如果是 Blob (录制/本地文件)，必须先上传
+                    if (typeof recordedBlob !== 'undefined' && recordedBlob) {
+                        // ✅ 修复：更稳健的文件构造方式
+                        // 1. 确保拿到的是纯 Blob
+                        const rawBlob = recordedBlob instanceof Blob ? recordedBlob : new Blob([recordedBlob], { type: 'video/webm' });
+
+                        // 2. 构造一个新的 File 对象，使用安全的文件名
+                        // 注意：使用 Date.now() 避免文件名包含特殊字符
+                        const fileName = `raw_${Date.now()}.mp4`;
+                        const file = new File([rawBlob], fileName, { type: 'video/mp4' });
+
+                        console.log('正在上传原片:', fileName, '大小:', file.size);
+
+                        // ✅ 修复 2: 手动构造请求，绕过 api.js，确保参数完全可控
+                        const formData = new FormData();
+                        formData.append('video', file);
+                        formData.append('title', `raw_crop_${Date.now()}`);
+                        formData.append('description', 'auto_crop_upload');
+
+                        const token = localStorage.getItem('token');
+                        // 假设上传接口是 /api/videos (POST)
+                        const upRes = await fetch('/api/v1/videos', {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${token}` },
+                            body: formData
+                        });
+
+                        if (!upRes.ok) {
+                            // 获取详细错误信息
+                            const errText = await upRes.text();
+                            throw new Error(`上传失败 (${upRes.status}): ${errText}`);
+                        }
+
+                        const uploadRes = await upRes.json();
+
+                        if (!uploadRes || !uploadRes.id) {
+                            throw new Error("上传响应异常，未获取到 ID");
+                        }
+                        videoId = uploadRes.id;
                     }
-                } catch (e) {
-                    // 如果是超时或报错，才停止
-                    if (e.message.includes('超时') || e.message.includes('报错')) {
-                        clearInterval(pollInterval);
-                        console.error(e);
-                        // 降级到本地处理...
-                        fallbackToLocalCrop();
+
+                    if (!videoId) throw new Error("无法获取视频 ID");
+
+                    // A2. 提交任务
+                    applyBtn.textContent = '☁️ 2/3 提交队列...';
+                    await DanceMirrorAPI.cropVideoCloud(videoId, cropParams);
+                    //await 在这里就是 “等云端把视频裁剪完，再干后面的事”
+
+                    showMessage('✅ 任务已提交云端，正在处理...', 'success', 2000);
+
+                    // A3. 轮询状态
+                    let attempts = 0;
+                    const maxAttempts = 60; // ✅ 增加到 60 次 (约 60秒)
+
+                    const pollInterval = setInterval(async () => {
+                        attempts++;
+                        try {
+                            // 注意：这里要用 /v1
+                            const statusRes = await DanceMirrorAPI.getVideoStatus(videoId);
+                            console.log('Cloud status:', statusRes.status);
+
+                            if (statusRes.status === 'completed') {
+                                clearInterval(pollInterval);
+                                showMessage('✅ 云端裁剪完成！', 'success');
+
+                                // 获取裁剪后视频详情
+                                const v = await DanceMirrorAPI.getVideo(videoId);
+
+                                if (v?.filePath && userVideo) {
+                                    userVideo.src = v.filePath;
+                                    userVideo.load();
+                                    userVideo.play().catch(() => { });
+                                }
+
+                                closeCropPanel();
+                                applyBtn.disabled = false;
+                                applyBtn.textContent = originalText;
+                            } else if (statusRes.status === 'failed') {
+                                clearInterval(pollInterval);
+                                throw new Error("云端处理报错");
+                            } else if (attempts >= maxAttempts) {
+                                clearInterval(pollInterval);
+                                throw new Error("云端处理超时 (60s)");
+                            }
+                        } catch (e) {
+                            // 如果是超时或报错，才停止
+                            if (e.message.includes('超时') || e.message.includes('报错')) {
+                                clearInterval(pollInterval);
+                                console.error(e);
+                                // 降级到本地处理...
+                                fallbackToLocalCrop();
+                            }
+                        }
+                    }, 1000);
+
+
+                    // 获取 videoInfo 前先判断 videoId，失败不阻塞
+                    if (!videoInfo && videoId) {
+                        try {
+                            videoInfo = await DanceMirrorAPI.getVideo(videoId);
+                        } catch (e) {
+                            console.warn('getVideo failed, skip detail fetch:', e);
+                        }
                     }
+
+                    // A4. 成功：更新播放器
+                    handleSuccess(videoInfo.filePath); // 假设后端返回的是 filePath (MinIO URL)
+                    return; // 结束，不执行降级逻辑
+
+                } catch (cloudErr) {
+                    console.warn('⚠️ 云端处理失败，切换至本地降级方案:', cloudErr);
+                    showMessage(`云端服务繁忙 (${cloudErr.message})，正在切换本地引擎...`, 'warning', 3000);
+                    // 继续向下执行，进入本地逻辑
                 }
-            }, 1000);
 
+                // ==========================================
+                // 🐢 策略 B: 本地 WASM 降级处理 (Fallback)
+                // ==========================================
+                try {
+                    applyBtn.textContent = '🐢 本地转码中...';
 
-    // 获取 videoInfo 前先判断 videoId，失败不阻塞
-    if (!videoInfo && videoId) {
-        try {
-            videoInfo = await DanceMirrorAPI.getVideo(videoId);
-        } catch (e) {
-            console.warn('getVideo failed, skip detail fetch:', e);
-        }
-    }            
+                    // B1. 准备 Blob
+                    let inputBlob = null;
+                    if (typeof recordedBlob !== 'undefined' && recordedBlob) {
+                        inputBlob = recordedBlob instanceof Blob ? recordedBlob : new Blob([recordedBlob]);
+                    } else if (window.userVideo && userVideo.src) {
+                        const resp = await fetch(userVideo.src);
+                        inputBlob = await resp.blob();
+                    }
 
-            // A4. 成功：更新播放器
-            handleSuccess(videoInfo.filePath); // 假设后端返回的是 filePath (MinIO URL)
-            return; // 结束，不执行降级逻辑
+                    if (!inputBlob) throw new Error('未找到视频源');
 
-        } catch (cloudErr) {
-            console.warn('⚠️ 云端处理失败，切换至本地降级方案:', cloudErr);
-            showMessage(`云端服务繁忙 (${cloudErr.message})，正在切换本地引擎...`, 'warning', 3000);
-            // 继续向下执行，进入本地逻辑
-        }
+                    // B2. 调用原本的 WASM 函数
+                    // 注意：cropAndTranscode 需要 w/h 字段，我们在上面 cropParams 里保留了
+                    const outBlob = await cropAndTranscode(inputBlob, cropParams, {
+                        format: 'mp4',
+                        onProgress: (r) => {
+                            const percent = Math.round(r * 100);
+                            applyBtn.textContent = `本地转码 ${percent}%`;
+                        }
+                    });
 
-        // ==========================================
-        // 🐢 策略 B: 本地 WASM 降级处理 (Fallback)
-        // ==========================================
-        try {
-            applyBtn.textContent = '🐢 本地转码中...';
-            
-            // B1. 准备 Blob
-            let inputBlob = null;
-            if(typeof recordedBlob!=='undefined' && recordedBlob) {
-                inputBlob = recordedBlob instanceof Blob ? recordedBlob : new Blob([recordedBlob]);
-            } else if(window.userVideo && userVideo.src){ 
-                const resp = await fetch(userVideo.src); 
-                inputBlob = await resp.blob(); 
-            }
+                    if (!outBlob) throw new Error('本地转码失败');
 
-            if(!inputBlob) throw new Error('未找到视频源');
+                    // B3. 成功：更新全局 Blob 并播放
+                    recordedBlob = outBlob;
+                    const localUrl = URL.createObjectURL(outBlob);
 
-            // B2. 调用原本的 WASM 函数
-            // 注意：cropAndTranscode 需要 w/h 字段，我们在上面 cropParams 里保留了
-            const outBlob = await cropAndTranscode(inputBlob, cropParams, { 
-                format:'mp4', 
-                onProgress: (r)=>{ 
-                    const percent = Math.round(r*100);
-                    applyBtn.textContent = `本地转码 ${percent}%`;
-                } 
+                    // 自动下载一份作为备份
+                    const a = document.createElement('a');
+                    a.href = localUrl;
+                    a.download = 'crop_local_' + Date.now() + '.webm';
+                    a.click();
+
+                    handleSuccess(localUrl);
+
+                } catch (localErr) {
+                    console.error(localErr);
+                    showMessage('❌ 所有处理方案均失败: ' + localErr.message, 'error', 5000);
+                    applyBtn.disabled = false;
+                    applyBtn.textContent = originalText;
+                }
+
+                // 通用成功回调
+                function handleSuccess(url) {
+                    applyBtn.textContent = '✅ 完成';
+                    applyBtn.disabled = false;
+
+                    userVideo.srcObject = null;
+                    userVideo.src = url;
+                    userVideo.muted = false;
+                    userVideo.load();
+
+                    // ✅ 核心修复：等待视频元数据加载完成后，动态设置容器宽高比
+                    userVideo.addEventListener('loadedmetadata', () => {
+                        const wrapper = userVideo.closest('.video-player-wrapper');
+                        if (wrapper && userVideo.videoWidth && userVideo.videoHeight) {
+                            // ✅ 强制覆盖所有尺寸属性
+                            wrapper.style.cssText = `
+                                aspect-ratio: ${userVideo.videoWidth} / ${userVideo.videoHeight} !important;
+                                height: auto !important;
+                                min-height: unset !important;
+                                max-height: unset !important;
+                                width: 100%;
+                            `;
+
+                            console.log(`✅ 右侧容器已强制调整为 ${userVideo.videoWidth}x${userVideo.videoHeight}`);
+                            console.log(`   容器实际高度: ${wrapper.offsetHeight}px`);
+                            console.log(`   视频实际高度: ${userVideo.offsetHeight}px`);
+                        }
+                    }, { once: true });
+
+                    // 启用相关按钮
+                    const dl = document.getElementById('downloadRecBtn'); if (dl) dl.disabled = false;
+                    const up = document.getElementById('uploadRecBtn'); if (up) up.disabled = false;
+
+                    showMessage('✅ 裁剪完成！', 'success', 3000);
+                    closeCropPanel();
+
+                    // 自动切到对照模式
+                    if (isSingleMode) document.getElementById('comparisonModeBtn').click();
+
+                    // 恢复按钮文字
+                    setTimeout(() => {
+                        applyBtn.textContent = originalText;
+                    }, 2000);
+                }
             });
+        })();
 
-            if(!outBlob) throw new Error('本地转码失败');
-
-            // B3. 成功：更新全局 Blob 并播放
-            recordedBlob = outBlob; 
-            const localUrl = URL.createObjectURL(outBlob);
-            
-            // 自动下载一份作为备份
-            const a = document.createElement('a'); 
-            a.href = localUrl; 
-            a.download = 'crop_local_'+Date.now()+'.webm'; 
-            a.click();
-
-            handleSuccess(localUrl);
-
-        } catch (localErr) {
-            console.error(localErr);
-            showMessage('❌ 所有处理方案均失败: ' + localErr.message, 'error', 5000);
-            applyBtn.disabled = false;
-            applyBtn.textContent = originalText;
-        }
-
-        // 通用成功回调
-        function handleSuccess(url) {
-            applyBtn.textContent = '✅ 完成';
-            applyBtn.disabled = false;
-            
-            userVideo.srcObject = null;
-            userVideo.src = url;
-            userVideo.muted = false;
-            userVideo.load();
-
-    // ✅ 核心修复：等待视频元数据加载完成后，动态设置容器宽高比
-userVideo.addEventListener('loadedmetadata', () => {
-    const wrapper = userVideo.closest('.video-player-wrapper');
-    if (wrapper && userVideo.videoWidth && userVideo.videoHeight) {
-        // ✅ 强制覆盖所有尺寸属性
-        wrapper.style.cssText = `
-            aspect-ratio: ${userVideo.videoWidth} / ${userVideo.videoHeight} !important;
-            height: auto !important;
-            min-height: unset !important;
-            max-height: unset !important;
-            width: 100%;
-        `;
-        
-        console.log(`✅ 右侧容器已强制调整为 ${userVideo.videoWidth}x${userVideo.videoHeight}`);
-        console.log(`   容器实际高度: ${wrapper.offsetHeight}px`);
-        console.log(`   视频实际高度: ${userVideo.offsetHeight}px`);
-    }
-}, { once: true });
-
-            // 启用相关按钮
-            const dl = document.getElementById('downloadRecBtn'); if(dl) dl.disabled=false; 
-            const up = document.getElementById('uploadRecBtn'); if(up) up.disabled=false;
-
-            showMessage('✅ 裁剪完成！', 'success', 3000);
-            closeCropPanel();
-            
-            // 自动切到对照模式
-            if (isSingleMode) document.getElementById('comparisonModeBtn').click();
-            
-            // 恢复按钮文字
-            setTimeout(() => {
-                applyBtn.textContent = originalText;
-            }, 2000);
-        }
-    });
-})();
-  
     </script>
 </body>
+
 </html>

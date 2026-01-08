@@ -26,7 +26,7 @@ func NewRedisClient(addr string, password string, db int) *RedisClient {
 	})
 
 	// 测试连接
-	ctx := context.Background()
+	ctx := context.Background() //返回一个非 nil 的空上下文
 	if err := client.Ping(ctx).Err(); err != nil {
 		panic("❌ Redis 连接失败: " + err.Error())
 	}
