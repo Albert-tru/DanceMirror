@@ -257,7 +257,7 @@ func (h *Handler) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.cache.ClearUserVideosCache(userID)
+	h.cache.ClearUserVideosCache(r.Context(), userID)
 	utils.WriteJSON(w, http.StatusCreated, video)
 }
 
@@ -274,8 +274,8 @@ func (h *Handler) handleDeleteVideo(w http.ResponseWriter, r *http.Request) {
 		h.storage.Delete(context.Background(), video.ObjectKey)
 	}
 	h.store.DeleteVideo(id)
-	h.cache.ClearUserVideosCache(video.UserID)
-	h.cache.ClearVideoCache(id)
+	h.cache.ClearUserVideosCache(r.Context(), video.UserID)
+	h.cache.ClearVideoCache(r.Context(), id)
 
 	utils.WriteJSON(w, http.StatusOK, map[string]string{"message": "deleted"})
 }

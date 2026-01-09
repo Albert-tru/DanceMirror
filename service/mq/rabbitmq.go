@@ -60,14 +60,62 @@ func (c *RabbitMQClient) EnsureQueue(queueName string) error {
 		return fmt.Errorf("channel not initialized")
 	}
 
-	_, err := c.ch.QueueDeclare(
-		queueName,
+	// 1. 声明死信交换机
+	const dlxName = "dlx_exchange"
+	err := c.ch.ExchangeDeclare(
+		dlxName,
+		"direct",
+		true,  // durable
+		false, // auto-deleted
+		false, // internal
+		false, // no-wait
+		nil,   // arguments
+	)
+	if err != nil {
+		return fmt.Errorf("failed to declare dead-letter exchange: %v", err)
+	}
+
+	// 2. 声明死信队列
+	dlqName := queueName + "_dlq"
+	_, err = c.ch.QueueDeclare(
+		dlqName,
 		true,  // durable
 		false, // delete when unused
 		false, // exclusive
 		false, // no-wait
 		nil,   // arguments
 	)
+	if err != nil {
+		return fmt.Errorf("failed to declare dead-letter queue: %v", err)
+	}
+
+	// 3. 绑定死信队列到死信交换机
+	err = c.ch.QueueBind(
+		dlqName,
+		dlqName, // routing key
+		dlxName,
+		false,
+		nil,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to bind dead-letter queue: %v", err)
+	}
+
+	// 4. 声明主队列，设置死信交换机参数
+	args := amqp.Table{
+		"x-dead-letter-exchange":    dlxName,
+		"x-dead-letter-routing-key": dlqName,
+	}
+
+	_, err = c.ch.QueueDeclare(
+		queueName,
+		true,  // durable
+		false, // delete when unused
+		false, // exclusive
+		false, // no-wait
+		args,  // arguments
+	)
+
 	return err
 }
 
@@ -89,8 +137,9 @@ func (c *RabbitMQClient) Publish(queueName string, body []byte) error {
 		false,     // mandatory
 		false,     // immediate
 		amqp.Publishing{
-			ContentType: "application/json",
-			Body:        body,
+			ContentType:  "application/json",
+			Body:         body,
+			DeliveryMode: amqp.Persistent, // 持久化
 		})
 }
 
@@ -101,6 +150,16 @@ func (c *RabbitMQClient) Consume(queueName string) (<-chan amqp.Delivery, error)
 
 	if c.ch == nil {
 		return nil, fmt.Errorf("channel is nil")
+	}
+
+	//负载均衡
+	err := c.ch.Qos(
+		1,     // prefetch count(每次只分发一个消息)
+		0,     // prefetch size（0表示不限制大小）
+		false, // global（false表示应用于当前通道）
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to set QoS: %v", err)
 	}
 
 	return c.ch.Consume(
