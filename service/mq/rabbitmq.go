@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Albert-tru/DanceMirror/service/video"
+	"github.com/Albert-tru/DanceMirror/types"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -16,14 +16,21 @@ type CropTask struct {
 	UserID     int              `json:"user_id"`
 	InputPath  string           `json:"input_path"`
 	OutputPath string           `json:"output_path"`
-	Params     video.CropParams `json:"params"`
+	Params     types.CropParams `json:"params"`
 }
 
+// RabbitMQClient RabbitMQ 客户端结构体
 type RabbitMQClient struct {
 	conn *amqp.Connection
 	ch   *amqp.Channel
 	mu   sync.Mutex // 保护并发访问
 	url  string
+}
+
+// SyncVideoESMsg 用于同步视频到 Elasticsearch 的消息结构
+type SyncVideoESMsg struct {
+	VideoID int    `json:"video_id"`
+	Action  string `json:"action"` // "create", "update", "delete"
 }
 
 func NewRabbitMQClient(url string) *RabbitMQClient {

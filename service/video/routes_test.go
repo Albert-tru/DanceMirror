@@ -139,12 +139,12 @@ func setupTestHandler(t *testing.T) (*gorm.DB, *mux.Router, *types.User, string,
 	}
 
 	// 创建模拟存储
-	videoStore := NewStore(db)
+	videoStore := NewStore(db, nil)
 	videoStorage := newMockVideoStorage()
 
 	// 创建 Handler
 	userStore := &mockUserStore{db: db}
-	handler := NewHandler(videoStore, userStore, redisClient, videoStorage, nil)
+	handler := NewHandler(videoStore, userStore, redisClient, videoStorage, nil, nil)
 
 	// 创建路由
 	router := mux.NewRouter()

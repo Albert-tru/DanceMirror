@@ -13,6 +13,7 @@ import (
 	"github.com/Albert-tru/DanceMirror/service/mq"
 	"github.com/Albert-tru/DanceMirror/service/storage"
 	"github.com/Albert-tru/DanceMirror/service/video"
+"github.com/Albert-tru/DanceMirror/service/search"
 	"github.com/Albert-tru/DanceMirror/types"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"gorm.io/gorm"
@@ -69,6 +70,7 @@ func (w *CropWorker) processMessages(id int, msgs <-chan amqp.Delivery) {
 			// 可以选择 d.Nack(false, true) 重试，或者记录失败状态
 			w.updateVideoStatus(task.VideoID, "failed")
 			d.Nack(false, false) // 暂时不重试，避免死循环
+			//如果视频文件损坏导致ffmeg崩溃，就直接丢弃
 		} else {
 			log.Printf("✅ Task completed (VideoID: %d)", task.VideoID)
 			w.updateVideoStatus(task.VideoID, "done")
@@ -174,4 +176,28 @@ func (w *CropWorker) saveCroppedVideoRecord(originalVideoID int, newPath string)
 	}
 
 	return nil
+}
+
+func StartESWorker(mqClient *mq.RabbitMQClient, esClient *search.ESClient, videoStore types.VideoStore) {
+	msgs, err := mqClient.Consume("video_sync_es_queue")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	go func() {
+		for d := range msgs {
+			var msg mq.SyncVideoESMsg
+			json.Unmarshal(d.Body, &msg)
+
+			if msg.Action == "index" {
+				// 从 DB 读取最新完整数据
+				v, err := videoStore.GetVideoByID(msg.VideoID)
+				if err == nil {
+					// 写入 ES
+					esClient.IndexVideo(v)
+				}
+			}
+			d.Ack(false)
+		}
+	}()
 }

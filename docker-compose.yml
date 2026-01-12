@@ -127,6 +127,25 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.9.0
+    container_name: dancemirror-es
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m # 设置 JVM 堆内存大小
+      - xpack.security.enabled=false # 禁用安全功能以简化设置
+    ports:
+      - "9200:9200"
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    restart: unless-stopped
+    networks:
+      - dancemirror-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
       
 networks:
   dancemirror-network:
@@ -138,4 +157,6 @@ volumes:
   redis-data:
     driver: local
   minio-data:
+    driver: local
+  es-data:
     driver: local

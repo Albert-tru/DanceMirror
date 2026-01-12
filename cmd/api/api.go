@@ -15,6 +15,7 @@ import (
 
 	"github.com/Albert-tru/DanceMirror/service/cache"
 	"github.com/Albert-tru/DanceMirror/service/mq"
+	"github.com/Albert-tru/DanceMirror/service/search"
 	"github.com/Albert-tru/DanceMirror/service/storage"
 	"github.com/Albert-tru/DanceMirror/service/user"
 	"github.com/Albert-tru/DanceMirror/service/video"
@@ -28,6 +29,7 @@ type APIServer struct {
 	redisClient *cache.RedisClient
 	storage     storage.VideoStorage
 	mq          *mq.RabbitMQClient
+	es          *search.ESClient
 }
 
 func NewAPIServer(
@@ -36,6 +38,7 @@ func NewAPIServer(
 	redisClient *cache.RedisClient,
 	storage storage.VideoStorage,
 	mq *mq.RabbitMQClient,
+	es *search.ESClient,
 ) *APIServer {
 	return &APIServer{
 		addr:        addr,
@@ -43,6 +46,7 @@ func NewAPIServer(
 		redisClient: redisClient,
 		storage:     storage,
 		mq:          mq,
+		es:          es,
 	}
 }
 
@@ -76,24 +80,41 @@ func (s *APIServer) Run() error {
 		_, _ = w.Write([]byte("ready"))
 	})
 
-	// 静态文件服务
 	// uploads
 	router.PathPrefix("/uploads/").Handler(
 		http.StripPrefix("/uploads/", http.FileServer(http.Dir("./uploads"))))
 
 	// static (frontend)
 	fs := http.FileServer(http.Dir("./static"))
-	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// 如果路径是空的或者指向根目录，就默认服务 index.html
-		if r.URL.Path == "" || r.URL.Path == "/" {
-			r.URL.Path = "/index.html"
-		}
-		fs.ServeHTTP(w, r)
-	})))
+
+	// ✅ 修复：直接使用 FileServer，去除手动修改 Path 的闭包
+	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", fs))
+
+	// ✅ 新增：访问根目录 http://localhost:8080/ 时自动跳到首页
+	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/static/index.html", http.StatusFound)
+	})
 
 	// 初始化 Services
 	userStore := user.NewStore(s.db)
-	videoStore := video.NewStore(s.db)
+	videoStore := video.NewStore(s.db, s.mq)
+
+	// ES 初始化（若未传入则尝试从环境创建）
+	if s.es == nil {
+		esAddr := os.Getenv("ES_ADDR")
+		if esAddr == "" {
+			esAddr = os.Getenv("ELASTICSEARCH_URL")
+		}
+		if esAddr != "" {
+			if esClient, err := search.NewESClient(esAddr); err != nil {
+				log.Printf("ES init failed: %v (addr=%s)", err, esAddr)
+			} else {
+				s.es = esClient
+			}
+		} else {
+			log.Printf("ES not configured; search features disabled")
+		}
+	}
 
 	// User Handler
 	userHandler := user.NewHandler(userStore)
@@ -109,7 +130,7 @@ func (s *APIServer) Run() error {
 		return s.mq.Publish("video_crop_queue", body)
 	}
 
-	videoHandler := video.NewHandler(videoStore, userStore, s.redisClient, s.storage, publishCrop)
+	videoHandler := video.NewHandler(videoStore, userStore, s.redisClient, s.storage, publishCrop, s.es)
 	videoHandler.RegisterRoutes(subrouter)
 
 	// Debug Routes
@@ -136,7 +157,7 @@ func (s *APIServer) Run() error {
 		log.Printf("🚀 Server is running on %s", s.addr)
 		// 打印 Redis/MQ 状态 (可选)
 		log.Printf("MQ Connected: %v", s.mq != nil)
-
+		log.Printf("ES Connected: %v", s.es != nil)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("listen: %s\n", err)
 		}

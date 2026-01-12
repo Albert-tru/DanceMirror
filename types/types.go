@@ -43,7 +43,8 @@ type Video struct {
 	ID          int            `json:"id" gorm:"primaryKey;autoIncrement"`
 	UserID      int            `json:"userId" gorm:"column:userId"` // 添加 gorm tag
 	Title       string         `json:"title" gorm:"not null"`
-	Description string         `json:"description"`
+	Description string         `json:"description" gorm:"column:tags;size:255"`
+	Tags        string         `json:"tags"`
 	FilePath    string         `json:"filePath" gorm:"column:filePath;size 255;not null"` // 添加 gorm tag
 	ObjectKey   string         `json:"objectKey" gorm:"column:objectKey;not null"`        // 添加 gorm tag
 	FileName    string         `json:"fileName" gorm:"column:fileName;not null"`          // 添加 gorm tag
@@ -64,6 +65,7 @@ type Video struct {
 type UploadVideoPayload struct {
 	Title       string `json:"title" validate:"required"`
 	Description string `json:"description"`
+	Tags        string `json:"tags"` //前端传来的标签字符串，如“Jazz，Kpop，Hiphop”
 }
 
 // Practice 练习记录结构
@@ -99,6 +101,7 @@ type VideoStore interface {
 	GetVideoByID(id int) (*Video, error)
 	CreateVideo(video *Video) error
 	UpdateVideo(video *Video) error
+GetVideosByIDs(ids []int) ([]*Video, error)
 	DeleteVideo(id int) error
 }
 
@@ -108,4 +111,12 @@ type PracticeStore interface {
 	GetPracticeByID(id int) (*Practice, error)
 	CreatePractice(practice *Practice) error
 	DeletePractice(id int) error
+}
+
+// CropParams 视频裁剪参数
+type CropParams struct {
+X      int `json:"x"`
+Y      int `json:"y"`
+Width  int `json:"width"`
+Height int `json:"height"`
 }

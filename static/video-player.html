@@ -1310,6 +1310,56 @@
         </div>
     </div>
 
+   <!-- ✅ 新增：上传信息填写模态框 -->
+    <div id="uploadMetaModal" class="cloud-select-modal hidden" aria-hidden="true" style="z-index: 10001;">
+        <div class="cloud-select-header">
+            <h3>☁️ 填写视频信息</h3>
+            <button class="cloud-select-close" id="uploadMetaClose">✖</button>
+        </div>
+        <div style="padding: 0 8px 16px;">
+            <div style="margin-bottom: 16px;">
+                <label style="display:block;margin-bottom:6px;font-weight:600;font-size:14px;color:var(--text-primary);">视频标题 <span style="color:red">*</span></label>
+                <input type="text" id="metaTitle" class="form-input" placeholder="给视频起个名字..." 
+                    style="width:100%;padding:10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-primary);color:var(--text-primary);">
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+                <div>
+                    <label style="display:block;margin-bottom:6px;font-weight:600;font-size:14px;color:var(--text-primary);">舞种</label>
+                    <select id="metaGenre" class="form-input" 
+                        style="width:100%;padding:10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-primary);color:var(--text-primary);">
+                        <option value="Urban">Urban Urban</option>
+                        <option value="Hiphop">Hiphop 嘻哈</option>
+                        <option value="Jazz">Jazz 爵士</option>
+                        <option value="Kpop">K-Pop</option>
+                        <option value="Popping">Popping 震感舞</option>
+                        <option value="Locking">Locking 锁舞</option>
+                        <option value="Breaking">Breaking 地板舞</option>
+                        <option value="Contemporary">Contemporary 现代舞</option>
+                        <option value="Choreography">Choreography 编舞</option>
+                        <option value="Other">Other 其他</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display:block;margin-bottom:6px;font-weight:600;font-size:14px;color:var(--text-primary);">背景音乐</label>
+                    <input type="text" id="metaMusic" class="form-input" placeholder="例如: Bruno Mars - Treasure" 
+                        style="width:100%;padding:10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-primary);color:var(--text-primary);">
+                </div>
+            </div>
+
+            <div style="margin-bottom: 24px;">
+                <label style="display:block;margin-bottom:6px;font-weight:600;font-size:14px;color:var(--text-primary);">备注描述</label>
+                <textarea id="metaDesc" class="form-input" placeholder="记录你的练习心得..." rows="3" 
+                    style="width:100%;padding:10px;border:1px solid var(--border);border-radius:var(--radius-sm);resize:vertical;background:var(--bg-primary);color:var(--text-primary);"></textarea>
+            </div>
+
+            <div style="display:flex;justify-content:flex-end;gap:12px;">
+                <button class="btn" id="uploadMetaCancel">取消</button>
+                <button class="btn btn-success" id="uploadMetaConfirm">🚀 确认并上传</button>
+            </div>
+        </div>
+    </div>   
+
     <!-- 裁剪面板（录制或本地视频加载后可打开） -->
     <div id="cropPanel" class="crop-panel hidden" aria-hidden="true">
         <div class="crop-close" id="cropClose">✖</div>
@@ -1405,6 +1455,7 @@
             initLayoutSwitcher(); // ✅ 新增：初始化布局切换
             initLocalUpload();
             initCloudSelect();
+            initUploadMetaModal(); // ✅ 新增：初始化上传信息模态框
             initMiscControls();
             initSingleControls(); //初始化单视频控制绑定
             loadVideos();
@@ -1608,6 +1659,86 @@
             document.getElementById('uploadRecBtn').addEventListener('click', uploadRecording);
         }
 
+        const uploadModal = document.getElementById('uploadMetaModal');
+        const metaTitleInput = document.getElementById('metaTitle');
+        const metaGenreSelect = document.getElementById('metaGenre');
+        const metaMusicInput = document.getElementById('metaMusic');
+        const metaDescInput = document.getElementById('metaDesc');
+
+        function initUploadMetaModal() {
+            document.getElementById('uploadMetaClose').addEventListener('click', closeUploadModal);
+            document.getElementById('uploadMetaCancel').addEventListener('click', closeUploadModal);
+            document.getElementById('uploadMetaConfirm').addEventListener('click', performRealUpload);
+        }
+
+        function openUploadModal() {
+            if (!recordedBlob) { showMessage('没有可上传的视频', 'error', 2000); return; }
+            
+            // 预填充默认标题
+            const dateStr = new Date().toLocaleString('zh-CN', {month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'});
+            metaTitleInput.value = `练习视频 ${dateStr}`;
+            metaMusicInput.value = '';
+            metaDescInput.value = '';
+            
+            uploadModal.classList.remove('hidden');
+            uploadModal.setAttribute('aria-hidden', 'false');
+            metaTitleInput.focus();
+        }
+
+        function closeUploadModal() {
+            uploadModal.classList.add('hidden');
+            uploadModal.setAttribute('aria-hidden', 'true');
+        }
+
+        async function performRealUpload() {
+            const title = metaTitleInput.value.trim();
+            if (!title) {
+                showMessage('请输入视频标题', 'error');
+                metaTitleInput.focus();
+                return;
+            }
+
+            const genre = metaGenreSelect.value;
+            const music = metaMusicInput.value.trim();
+            const rawDesc = metaDescInput.value.trim();
+
+            // 构造描述字段（兼容现有后端，将元数据存入 description）
+            // 格式：【舞种: Jazz】\n【音乐: Song Name】\n用户描述...
+            let finalDesc = "";
+            if (genre) finalDesc += `【舞种: ${genre}】\n`;
+            if (music) finalDesc += `【音乐: ${music}】\n`;
+            if (rawDesc) finalDesc += `\n${rawDesc}`;
+            
+            const file = recordedBlob instanceof File ? recordedBlob : (recordedBlob ? new File([recordedBlob], title + '.webm', { type: recordedBlob.type || 'video/webm' }) : null);
+            
+            if (!file) { showMessage('文件处理错误', 'error'); return; }
+
+            // UI Loading 状态
+            const confirmBtn = document.getElementById('uploadMetaConfirm');
+            const originalBtnText = confirmBtn.textContent;
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = '☁️ 上传中...';
+
+            try {
+                showMessage('正在上传...', 'info');
+                await DanceMirrorAPI.uploadVideo(file, { 
+                    title: title, 
+                    description: finalDesc.trim() 
+                });
+                
+                showMessage('上传成功！', 'success', 2000);
+                closeUploadModal();
+                loadVideos(); // 刷新列表
+            } catch (err) {
+                console.error(err);
+                showMessage('上传失败: ' + (err.message || err), 'error', 4000);
+            } finally {
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = originalBtnText;
+                // filepath: \home\dmin\go\DanceMirror\static\video-player.html        
+            }
+        }
+
         async function startRecording() {
             try {
                 // 检查浏览器支持
@@ -1809,49 +1940,106 @@
             const body = document.body;
             const single = document.getElementById('singleVideoContainer'), compare = document.getElementById('comparisonContainer');
 
-            // ensure initial UI state (remove persistent .hidden that was blocking display)
-            single.classList.remove('hidden');
-            compare.classList.remove('hidden');
+           // 确保初始 UI 状态
+            document.getElementById('singleVideoContainer')?.classList.remove('hidden');
+            document.getElementById('comparisonContainer')?.classList.remove('hidden');
 
-            // detect initial mode from body class (if any)
+            // 检测当前模式
             isSingleMode = body.classList.contains('mode-single');
 
-            // update button styles according to current mode
-            if (isSingleMode) { sm.classList.add('btn-primary'); cm.classList.remove('btn-primary'); }
-            else { cm.classList.add('btn-primary'); sm.classList.remove('btn-primary'); }
+            // 统一更新按钮状态的辅助函数
+            const updateButtons = () => {
+                if (isSingleMode) { 
+                    sm.classList.add('btn-mode-active'); 
+                    cm.classList.remove('btn-mode-active'); 
+                } else { 
+                    cm.classList.add('btn-mode-active'); 
+                    sm.classList.remove('btn-mode-active'); 
+                }
+            };
+            updateButtons();
 
+            //1. 切换到【单视频模式】
             sm.addEventListener('click', () => {
                 if (isSingleMode) return;
-                isSingleMode = true;
-                body.classList.add('mode-single'); // CSS will show single container
-                body.classList.remove('mode-comparison');
-                // copy source so single player is ready
+                                // --- 步骤 A: 状态同步 (原视频 -> 单视频) ---
                 const svid = document.getElementById('singleVideo');
                 try {
-                    if (originalVideo && originalVideo.currentSrc) {
-                        svid.src = originalVideo.currentSrc;
-                    } else if (originalVideo && originalVideo.src) {
+                    // 同步 Source (仅当不同时赋值，避免重新加载)
+                    if (originalVideo.src && svid.src !== originalVideo.src) {
                         svid.src = originalVideo.src;
                     }
-                    svid.load();
-                } catch (e) { console.warn('set single src failed', e); }
+                    
+                    // 同步播放属性
+                    if (originalVideo.readyState > 0) {
+                        svid.currentTime = originalVideo.currentTime;
+                    }
+                    svid.muted = originalVideo.muted; 
+                    svid.volume = originalVideo.volume;
+                    svid.playbackRate = originalVideo.playbackRate;
+                    svid.loop = originalVideo.loop;
+                    
+                    // 同步播放状态
+                    if (!originalVideo.paused) {
+                        svid.play().catch(e => console.warn('Sync play failed', e));
+                    } else {
+                        svid.pause();
+                    }
+                } catch (e) { console.warn('Sync to single failed', e); }
 
+                // --- 步骤 B: UI 切换 ---
+                isSingleMode = true;
+                body.classList.add('mode-single'); 
+                body.classList.remove('mode-comparison');
+                updateButtons();
 
-                sm.classList.add('btn-primary');
-                cm.classList.remove('btn-primary');
-
-                // ✅ 新增：切换模式后重新绑定 AB 循环
+                // --- 步骤 C: 重新绑定逻辑 ---
                 reattachABLoopAfterModeSwitch();
             });
 
+            // 2. 切换到【同屏对照模式】
             cm.addEventListener('click', () => {
                 if (!isSingleMode) return;
+                
+                // --- 步骤 A: 反向状态同步 (单视频 -> 原视频) ---
+                const svid = document.getElementById('singleVideo');
+                try {
+                    // 如果单模式下换了视频，把新源同步回来
+                    if (svid.src && (!originalVideo.src || originalVideo.src !== svid.src)) {
+                        originalVideo.src = svid.src; 
+                    }
+                    
+                    // 同步进度
+                    if (svid.readyState > 0) {
+                         originalVideo.currentTime = svid.currentTime;
+                    }
+                    // 同步倍速和循环
+                    originalVideo.playbackRate = svid.playbackRate;
+                    originalVideo.loop = svid.loop; 
+                    
+                    // 同步播放状态 (稍微延迟以等待 DOM 显示)
+                    if (!svid.paused) {
+                        setTimeout(() => originalVideo.play().catch(e => {}), 10);
+                    } else {
+                        originalVideo.pause();
+                    }
+
+                    // ⚡ 关键修复：容器从 display:none 恢复时，强制刷新宽高比
+                    // 否则由隐藏变为显示时，视频高度可能塌陷
+                    if (originalVideo.videoWidth) {
+                         const wrapper = originalVideo.closest('.video-player-wrapper');
+                         if(wrapper) wrapper.style.aspectRatio = `${originalVideo.videoWidth} / ${originalVideo.videoHeight}`;
+                    }
+
+                } catch(e) { console.warn('Sync back to original failed', e); }
+
+                // --- 步骤 B: UI 切换 ---
                 isSingleMode = false;
                 body.classList.remove('mode-single');
                 body.classList.add('mode-comparison');
-                cm.classList.add('btn-primary'); sm.classList.remove('btn-primary');
+                updateButtons();
 
-                // ✅ 新增：切换模式后重新绑定 AB 循环
+                // --- 步骤 C: 重新绑定逻辑 ---
                 reattachABLoopAfterModeSwitch();
             });
         }

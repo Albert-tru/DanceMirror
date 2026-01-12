@@ -36,6 +36,10 @@ type Config struct {
 
 	//消息队列
 	RabbitMQURL string // RabbitMQ 连接 URL
+
+	//es搜索
+	ElasticsearchURL string // Elasticsearch 连接 URL
+
 }
 
 var Envs = initConfig()
@@ -83,6 +87,8 @@ func initConfig() Config {
 
 		//消息队列
 		RabbitMQURL: getEnv("RABBITMQ_URL", "amqp://guest:guest@dancemirror-rabbitmq:5672/"),
+		//es搜索
+		ElasticsearchURL: getEnv("ELASTICSEARCH_URL", "http://localhost:9200"),
 	}
 }
 

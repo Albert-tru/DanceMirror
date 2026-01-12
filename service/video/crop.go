@@ -11,18 +11,13 @@ import (
 
 	"github.com/Albert-tru/DanceMirror/config"
 	"github.com/Albert-tru/DanceMirror/utils/logger"
+"github.com/Albert-tru/DanceMirror/types"
 )
 
 // CropParams 视频裁剪参数
-type CropParams struct {
-	X      int // 裁剪起始 X 坐标
-	Y      int // 裁剪起始 Y 坐标
-	Width  int // 裁剪宽度
-	Height int // 裁剪高度
-}
 
 // CropVideo 使用 FFmpeg 裁剪视频
-func CropVideo(inputPath string, outputPath string, params CropParams) error {
+func CropVideo(inputPath string, outputPath string, params types.CropParams) error {
 	// 验证裁剪参数
 	if params.Width <= 0 || params.Height <= 0 {
 		return fmt.Errorf("invalid crop dimensions: width=%d, height=%d", params.Width, params.Height)
@@ -108,28 +103,28 @@ func CleanupTempFile(path string) {
 }
 
 // ParseCropParams 从字符串解析裁剪参数
-func ParseCropParams(xStr, yStr, wStr, hStr string) (CropParams, error) {
+func ParseCropParams(xStr, yStr, wStr, hStr string) (types.CropParams, error) {
 	x, err := strconv.Atoi(xStr)
 	if err != nil {
-		return CropParams{}, fmt.Errorf("invalid cropX parameter: %v", err)
+		return types.CropParams{}, fmt.Errorf("invalid cropX parameter: %v", err)
 	}
 
 	y, err := strconv.Atoi(yStr)
 	if err != nil {
-		return CropParams{}, fmt.Errorf("invalid cropY parameter: %v", err)
+		return types.CropParams{}, fmt.Errorf("invalid cropY parameter: %v", err)
 	}
 
 	w, err := strconv.Atoi(wStr)
 	if err != nil {
-		return CropParams{}, fmt.Errorf("invalid cropW parameter: %v", err)
+		return types.CropParams{}, fmt.Errorf("invalid cropW parameter: %v", err)
 	}
 
 	h, err := strconv.Atoi(hStr)
 	if err != nil {
-		return CropParams{}, fmt.Errorf("invalid cropH parameter: %v", err)
+		return types.CropParams{}, fmt.Errorf("invalid cropH parameter: %v", err)
 	}
 
-	return CropParams{
+	return types.CropParams{
 		X:      x,
 		Y:      y,
 		Width:  w,

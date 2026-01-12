@@ -2,18 +2,51 @@ package video
 
 import (
 	"database/sql"
+	"encoding/json"
 
-	"gorm.io/gorm"
-
+	"github.com/Albert-tru/DanceMirror/service/mq"
 	"github.com/Albert-tru/DanceMirror/types"
+	"gorm.io/gorm"
 )
 
 type Store struct {
 	db *gorm.DB
+	mq *mq.RabbitMQClient
 }
 
-func NewStore(db *gorm.DB) *Store {
-	return &Store{db: db}
+func NewStore(db *gorm.DB, mq *mq.RabbitMQClient) *Store {
+	return &Store{
+		db: db,
+		mq: mq,
+	}
+}
+
+func (s *Store) GetVideosByIDs(ids []int) ([]*types.Video, error) {
+	if len(ids) == 0 {
+		return []*types.Video{}, nil
+	}
+
+	var videos []types.Video
+	// 使用 IN 查询
+	if err := s.db.Where("id IN ?", ids).Find(&videos).Error; err != nil {
+		return nil, err
+	}
+
+	// 建立 ID -> Video 的映射，方便按 ids 的顺序重排
+	videoMap := make(map[int]*types.Video)
+	for i := range videos {
+		videoMap[videos[i].ID] = &videos[i]
+	}
+
+	// 按照传入 ids 的顺序构造结果（保持 ES 的搜索相关度顺序）
+	orderedVideos := make([]*types.Video, 0, len(ids))
+	for _, id := range ids {
+		if v, exists := videoMap[id]; exists {
+			orderedVideos = append(orderedVideos, v)
+		}
+	}
+
+	return orderedVideos, nil
 }
 
 func (s *Store) GetVideoByID(id int) (*types.Video, error) {
@@ -38,7 +71,22 @@ func (s *Store) GetVideos(userID int) ([]*types.Video, error) {
 }
 
 func (s *Store) CreateVideo(video *types.Video) error {
-	return s.db.Create(video).Error
+	// 先存入数据库
+	err := s.db.Create(video).Error
+	if err != nil {
+		return err
+	}
+
+	// 如果 MQ 客户端存在，则异步发送 ES 同步消息
+	if s.mq != nil {
+		go func() {
+			msg := mq.SyncVideoESMsg{VideoID: video.ID, Action: "index"}
+			body, _ := json.Marshal(msg)
+			s.mq.Publish("video_sync_es_queue", body)
+		}()
+	}
+
+	return nil
 }
 
 func (s *Store) UpdateVideo(video *types.Video) error {

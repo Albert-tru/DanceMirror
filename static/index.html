@@ -190,8 +190,46 @@
             <form onsubmit="handleUpload(event)">
                 <div class="form-group">
                     <label for="videoTitle">视频标题</label>
-                    <input type="text" id="videoTitle" required placeholder="给您的舞蹈视频起个名字">
+                   <input type="text" id="videoTitle" required placeholder="自动生成 或 手动输入" oninput="markTitleDirty()">
+                    <small style="color:#999; font-size:12px;">默认格式：音乐 - 编舞 - 舞种 - 日期</small>
                 </div>
+
+                <!-- ✅ 修改: 改为多行布局以容纳编舞师 -->
+                <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                        <label for="videoGenre">舞种</label>
+                        <!-- ✅ 新增: onchange 触发标题更新 -->
+                        <select id="videoGenre" onchange="updateAutoTitle()" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; background: white;">
+                            <option value="">-- 选择舞种 --</option>
+                            <option value="Jazz">Jazz 爵士</option>
+                            <option value="Kpop">K-Pop</option>
+                            <option value="Urban">Urban Urban</option>
+                            <option value="Hiphop">Hiphop 嘻哈</option>
+                            <option value="Choreography">Choreo 编舞</option>
+                            <option value="Popping">Popping 震感舞</option>
+                            <option value="Locking">Locking 锁舞</option>
+                            <option value="Breaking">Breaking 地板舞</option>
+                            <option value="Contemporary">Contemporary 现代舞</option>
+                            <option value="Other">Other 其他</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 15px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label for="videoMusic">背景音乐</label>
+                        <!-- ✅ 新增: oninput 触发标题更新 -->
+                        <input type="text" id="videoMusic" placeholder="例如: Treasure" oninput="updateAutoTitle()">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label for="videoChoreographer">编舞师 (可选)</label>
+                        <!-- ✅ 新增: 编舞师字段 -->
+                        <input type="text" id="videoChoreographer" placeholder="输入编舞师姓名" oninput="updateAutoTitle()">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>选择视频文件 <span style="color:red">*</span></label>                
                 <div class="form-group">
                     <label for="videoDescription">描述</label>
                     <textarea id="videoDescription" rows="3" placeholder="描述一下这支舞蹈..."></textarea>
@@ -409,7 +447,57 @@
                 Utils.showMessage('videosMessage', '删除失败: ' + error.message, 'error');
             }
         }
-        
+        // 标题状态标记与自动生成逻辑
+        let isTitleManuallyEdited = false;
+
+        function markTitleDirty() {
+            const val = document.getElementById('videoTitle').value;
+            // 如果用户清空了标题，视为放弃手动修改，恢复由于字段变动触发的自动模式
+            if (!val || val.trim() === '') {
+                isTitleManuallyEdited = false;
+                updateAutoTitle();
+            } else {
+                isTitleManuallyEdited = true;
+            }
+        }
+
+        function updateAutoTitle() {
+            if (isTitleManuallyEdited) return;
+
+            const genreSelect = document.getElementById('videoGenre');
+            // 只取舞种英文名（如 "Jazz 爵士" -> "Jazz"）
+            const genre = genreSelect.value ? genreSelect.options[genreSelect.selectedIndex].text.split(' ')[0] : '';
+            const music = document.getElementById('videoMusic').value.trim();
+            const choreo = document.getElementById('videoChoreographer').value.trim();
+            
+            // 获取当前日期 YYMMDD
+            const now = new Date();
+            const dateStr = now.getFullYear().toString().substr(2) + 
+                            (now.getMonth()+1).toString().padStart(2, '0') + 
+                            now.getDate().toString().padStart(2, '0');
+
+            // 格式：音乐 - XX编舞（若有） - 舞种 - 日期
+            let parts = [];
+            
+            // 1. 音乐 (默认为 '练习视频')
+            parts.push(music || '练习视频');
+
+            // 2. 编舞
+            if (choreo) {
+                parts.push(choreo + '编舞');
+            }
+
+            // 3. 舞种
+            if (genre) {
+                parts.push(genre);
+            }
+
+            // 4. 日期
+            parts.push(dateStr);
+
+            document.getElementById('videoTitle').value = parts.join('-');
+        }
+
         // 显示文件名
         function displayFileName() {
             const file = document.getElementById('videoFile').files[0];
@@ -423,33 +511,52 @@
         // 处理视频上传
         async function handleUpload(event) {
             event.preventDefault();
+
+            // 0. 获取标题
+            if (!isTitleManuallyEdited) {
+                updateAutoTitle();
+            }
             
             const title = document.getElementById('videoTitle').value;
-            const description = document.getElementById('videoDescription').value;
-            const file = document.getElementById('videoFile').files[0];
+            // 1. 获取新字段的值
+            const genre = document.getElementById('videoGenre').value;
+            const music = document.getElementById('videoMusic').value.trim();
+            const rawDescription = document.getElementById('videoDescription').value;
+
+            const fileInput = document.getElementById('videoFile');
+            const file = fileInput ? fileInput.files[0] : null; 
             
+            // 基础校验
             if (!title.trim()) {
                 Utils.showMessage('uploadMessage', '请输入视频标题', 'error');
                 return;
             }
 
             if (!file) {
-            // 验证文件类型
-            const validTypes = ['video/mp4', 'video/mpeg', 'video/quicktime', 'video/x-msvideo', 'video/x-ms-wmv', 'video/webm', 'video/x-matroska'];
-            if (!validTypes.includes(file.type) && !file.name.match(/.(mp4|mov|avi|wmv|webm|mkv)$/i)) {
-                Utils.showMessage('uploadMessage', '请选择有效的视频文件 (MP4, MOV, AVI, WMV, WebM, MKV)', 'error');
-            // 验证文件大小 (500MB)
-            const maxSize = 524288000;
-            if (file.size > maxSize) {
-                Utils.showMessage('uploadMessage', '文件太大，请选择小于 500MB 的视频', 'error');
-                return;
-            }
-                return;
-            }
                 Utils.showMessage('uploadMessage', '请选择视频文件', 'error');
                 return;
             }
-            
+
+            // ... (保持原有的文件类型和大小校验逻辑不变) ...
+            const validTypes = ['video/mp4', 'video/mpeg', 'video/quicktime', 'video/x-msvideo', 'video/x-ms-wmv', 'video/webm', 'video/x-matroska'];
+            const isVideoExtension = /\.(mp4|mov|avi|wmv|webm|mkv|m4v)$/i.test(file.name);
+            if (!validTypes.includes(file.type) && !isVideoExtension) {
+                Utils.showMessage('uploadMessage', '文件格式不支持', 'error');
+                return;
+            }
+            if (file.size > 524288000) {
+                Utils.showMessage('uploadMessage', '文件太大', 'error');
+                return;
+            }
+
+            // 2. 构造包含元数据的最终描述
+            // 格式：【舞种: Jazz】\n【音乐: Song Name】\n用户原本的描述
+            let finalDescription = "";
+            if (genre) finalDescription += `【舞种: ${genre}】\n`;
+            if (music) finalDescription += `【音乐: ${music}】\n`;
+            if (rawDescription.trim()) finalDescription += `\n${rawDescription.trim()}`;
+
+            // 开始上传 UI 状态
             const uploadBtn = document.getElementById('uploadBtn');
             const progressDiv = document.getElementById('uploadProgress');
             const progressBar = document.getElementById('progressBar');
@@ -458,9 +565,16 @@
             uploadBtn.disabled = true;
             uploadBtn.textContent = '上传中...';
             progressDiv.style.display = 'block';
+            progressBar.style.width = '0%';
+            progressText.textContent = '0%';
             
             try {
-                await DanceMirrorAPI.uploadVideo({title: title, description: description, file: file}, (percent) => {
+                // 3. 提交 finalDescription 而不是 rawDescription
+                await DanceMirrorAPI.uploadVideo({
+                    title: title, 
+                    description: finalDescription.trim(), // 使用拼接好的描述
+                    file: file
+                }, (percent) => {
                     const rounded = Math.round(percent);
                     progressBar.style.width = rounded + '%';
                     progressText.textContent = rounded + '%';
@@ -471,15 +585,20 @@
                 // 重置表单
                 event.target.reset();
                 document.getElementById('fileName').textContent = '';
+                // 重置标题编辑状态
+                isTitleManuallyEdited = false;
                 progressDiv.style.display = 'none';
                 
-                // 切换到视频列表
+                // 刷新视频列表
                 setTimeout(() => {
                     switchMainTab('videos');
-                    document.querySelector('#mainTabs .tab:first-child').click();
+                    const firstTab = document.querySelector('#mainTabs .tab:first-child');
+                    if(firstTab) firstTab.click();
                 }, 1500);
             } catch (error) {
-                Utils.showMessage('uploadMessage', '上传失败: ' + error.message, 'error');
+                console.error(error);
+                Utils.showMessage('uploadMessage', '上传失败: ' + (error.message || '未知错误'), 'error');
+                progressDiv.style.display = 'none';
             } finally {
                 uploadBtn.disabled = false;
                 uploadBtn.textContent = '上传视频';

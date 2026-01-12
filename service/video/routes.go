@@ -14,6 +14,7 @@ import (
 	"github.com/Albert-tru/DanceMirror/service/auth"
 	"github.com/Albert-tru/DanceMirror/service/cache"
 	"github.com/Albert-tru/DanceMirror/service/storage"
+	"github.com/Albert-tru/DanceMirror/service/search"
 	"github.com/Albert-tru/DanceMirror/types"
 	"github.com/Albert-tru/DanceMirror/utils"
 	"github.com/gorilla/mux"
@@ -27,15 +28,17 @@ type Handler struct {
 	cache       *cache.RedisClient
 	storage     storage.VideoStorage
 	publishCrop func(task map[string]interface{}) error
+	esClient    *search.ESClient
 }
 
-func NewHandler(store types.VideoStore, userStore types.UserStore, cache *cache.RedisClient, storage storage.VideoStorage, publishCrop func(task map[string]interface{}) error) *Handler {
+func NewHandler(store types.VideoStore, userStore types.UserStore, cache *cache.RedisClient, storage storage.VideoStorage, publishCrop func(task map[string]interface{}) error, esClient *search.ESClient) *Handler {
 	return &Handler{
 		store:       store,
 		userStore:   userStore,
 		cache:       cache,
 		storage:     storage,
 		publishCrop: publishCrop,
+		esClient:    esClient,
 	}
 }
 
@@ -122,7 +125,7 @@ func (h *Handler) handleDispatchCropTask(w http.ResponseWriter, r *http.Request)
 	}
 
 	// 3. 解析裁剪参数 (JSON Body)
-	var params CropParams
+	var params types.CropParams
 	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
 		utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("invalid crop params"))
 		return
@@ -290,4 +293,25 @@ func (h *Handler) checkVideoOwnership(w http.ResponseWriter, r *http.Request, vi
 		return nil, fmt.Errorf("permission denied")
 	}
 	return video, nil
+}
+
+func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query().Get("q")
+	if query == "" {
+		h.handleGetVideos(w, r) // 如果没有关键词，回退到普通列表
+		return
+	}
+
+	// 调用 ES 搜索拿到 ID 列表
+	ids, err := h.esClient.SearchVideos(query, 1, 20)
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	// 根据 ID 回 MySQL 查完整数据 (或者直接从 ES 返回部分字段)
+	// 这里简单演示回表查，保证数据最新
+	videos, err := h.store.GetVideosByIDs(ids)
+
+	utils.WriteJSON(w, http.StatusOK, videos)
 }

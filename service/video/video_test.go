@@ -30,7 +30,7 @@ func TestVideoStore_Integration(t *testing.T) {
 	db.Create(testUser)
 
 	// 3. 创建 Store 实例
-	store := NewStore(db)
+	store := NewStore(db, nil)
 
 	// 4. 在所有测试结束后清理用户
 	t.Cleanup(func() {
@@ -265,7 +265,7 @@ func TestVideoStore_EdgeCases(t *testing.T) {
 	}
 	db.Create(&testUser)
 
-	store := NewStore(db)
+	store := NewStore(db, nil)
 
 	t.Run("should handle very long title", func(t *testing.T) {
 		longTitle := string(make([]byte, 300)) // 超长标题

@@ -10,6 +10,7 @@ import (
 	"github.com/Albert-tru/DanceMirror/db"
 	"github.com/Albert-tru/DanceMirror/service/cache"
 	"github.com/Albert-tru/DanceMirror/service/mq"
+	"github.com/Albert-tru/DanceMirror/service/search"
 	"github.com/Albert-tru/DanceMirror/service/storage"
 	"github.com/Albert-tru/DanceMirror/service/worker"
 	"github.com/Albert-tru/DanceMirror/types"
@@ -56,6 +57,12 @@ func main() {
 		log.Println("✅ 本地存储初始化成功 (main)")
 	}
 
+	// 初始化es
+	esClient, err := search.NewESClient(config.Envs.ElasticsearchURL)
+	if err != nil {
+		log.Fatalf("❌ ElasticSearch 初始化失败: %v", err)
+	}
+
 	// 4. 初始化消息队列 (无全局变量)
 	mqClient := mq.NewRabbitMQClient(config.Envs.RabbitMQURL)
 	var mqErr error
@@ -85,7 +92,7 @@ func main() {
 	cropWorker.Start(5)
 
 	// 6. 启动 Web 服务器[api.go]
-	server := api.NewAPIServer(":"+config.Envs.Port, database, redisClient, storageClient, mqClient)
+	server := api.NewAPIServer(":"+config.Envs.Port, database, redisClient, storageClient, mqClient, esClient)
 	if err := server.Run(); err != nil {
 		log.Fatal(err)
 	}
