@@ -7,8 +7,8 @@
     <link rel="stylesheet" href="/static/css/common.css">
     <style>
         body {
-            display: flex;
-            align-items: center;
+            /* 修复之前的 Flex 布局导致的宽度问题 */
+            display: block; 
         }
         
         .hero-link {
@@ -100,6 +100,98 @@
         .phone-input-group input {
             padding-left: 80px;
         }
+
+        /* ✅ START: 横向滚动布局 (Swimlanes) */
+        .genre-section {
+            margin-bottom: 30px;
+        }
+        .genre-header {
+            font-size: 18px;
+            font-weight: bold;
+            color: #2d3748;
+            margin-bottom: 15px;
+            border-left: 4px solid #667eea;
+            padding-left: 10px;
+            display: flex;
+            align-items: center;
+        }
+        .video-row {
+            display: flex;
+            gap: 20px;
+            overflow-x: auto;
+            padding-bottom: 15px;
+            padding-left: 4px;
+            padding-right: 4px;
+            scrollbar-width: thin;
+            scrollbar-color: #cbd5e0 #f7fafc;
+        }
+        .video-row::-webkit-scrollbar { height: 6px; }
+        .video-row::-webkit-scrollbar-track { background: #f7fafc; border-radius: 3px; }
+        .video-row::-webkit-scrollbar-thumb { background-color: #cbd5e0; border-radius: 3px; }
+
+        /* 视频卡片样式调整 */
+        .video-card {
+            min-width: 260px;
+            width: 260px;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            transition: transform 0.2s;
+            display: flex; 
+            flex-direction: column;
+            border: 1px solid #f1f5f9;
+        }
+        .video-card:hover { transform: translateY(-3px); box-shadow: 0 8px 16px rgba(0,0,0,0.1); }
+        .video-card video { width: 100%; height: 150px; object-fit: cover; background: #000; }
+        .video-card-content { padding: 12px; flex: 1; display: flex; flex-direction: column; }
+        .video-card h3 {
+            margin: 0 0 6px 0;
+            font-size: 14px;
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            height: 40px;
+        }
+        .meta-info {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-top: auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .delete-btn-link {
+            color: #ef4444;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 12px;
+            padding: 0;
+        }
+        .delete-btn-link:hover { text-decoration: underline; }
+
+        /* ✅ END: 横向滚动布局 */
+
+        /* ✅ START: 搜索结果布局 */
+        .search-results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); 
+            gap: 20px;
+            padding-bottom: 30px;
+        }
+        .search-header {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 20px;
+            padding-left: 5px;
+        }
+        .search-results-grid .video-card {
+            width: 100%;
+            min-width: unset;
+        }      
     </style>
 </head>
 <body>
@@ -112,11 +204,22 @@
             <a href="/static/video-player.html">🎬 进入增强视频播放器</a>
             <p>⏱️ 播放速度调节 | 🪞 镜面翻转 | 🔄 AB循环 | ⌨️ 快捷键支持</p>
         </div>
-        
-        <!-- 用户信息 -->
-        <div class="user-info" id="userInfo">
-            <strong>已登录:</strong> <span id="userPhone"></span>
-            <button class="btn-logout" onclick="handleLogout()">退出登录</button>
+
+        <div class="top-bar">
+            <!-- 搜索框 -->
+            <div class="search-container" id="searchContainer" style="display: none;">
+                <div class="search-icon"></div>
+                <!-- ✅ onkeydown 绑定 handleEnter() -->
+                <input type="text" class="search-input" id="searchInput" 
+                       placeholder="搜索标题、舞种、描述..." 
+                       oninput="handleSearch()"
+                       onkeydown="handleEnter(event)">
+            </div>
+            
+            <div class="user-info" id="userInfo">
+                <strong>已登录:</strong> <span id="userPhone"></span>
+                <button class="btn-logout" onclick="handleLogout()">退出登录</button>
+            </div>
         </div>
         
         <!-- 内容区标签 -->
@@ -132,7 +235,6 @@
                 <button class="tab" onclick="switchAuthTab('register')">注册</button>
             </div>
             
-            <!-- 登录表单 -->
             <div id="loginTab" class="auth-section show">
                 <div class="message" id="loginMessage"></div>
                 <form onsubmit="handleLogin(event)">
@@ -150,7 +252,6 @@
                 </form>
             </div>
             
-            <!-- 注册表单 -->
             <div id="registerTab" class="auth-section">
                 <div class="message" id="registerMessage"></div>
                 <form onsubmit="handleRegister(event)">
@@ -181,7 +282,7 @@
         <div id="videosTab" class="tab-content" style="display: none;">
             <div class="message" id="videosMessage"></div>
             <div class="loading" id="videosLoading">加载中</div>
-            <div class="video-list" id="videoList"></div>
+            <div id="videoListContainer"></div>
         </div>
         
         <!-- 上传视频 -->
@@ -191,14 +292,12 @@
                 <div class="form-group">
                     <label for="videoTitle">视频标题</label>
                    <input type="text" id="videoTitle" required placeholder="自动生成 或 手动输入" oninput="markTitleDirty()">
-                    <small style="color:#999; font-size:12px;">默认格式：音乐 - 编舞 - 舞种 - 日期</small>
+                   <small style="color:#999; font-size:12px;">默认格式：音乐 - 编舞 - 舞种 - 日期</small>
                 </div>
 
-                <!-- ✅ 修改: 改为多行布局以容纳编舞师 -->
                 <div style="display: flex; gap: 15px; margin-bottom: 15px;">
                     <div class="form-group" style="flex: 1; margin-bottom: 0;">
                         <label for="videoGenre">舞种</label>
-                        <!-- ✅ 新增: onchange 触发标题更新 -->
                         <select id="videoGenre" onchange="updateAutoTitle()" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; background: white;">
                             <option value="">-- 选择舞种 --</option>
                             <option value="Jazz">Jazz 爵士</option>
@@ -218,31 +317,29 @@
                 <div style="display: flex; gap: 15px;">
                     <div class="form-group" style="flex: 1;">
                         <label for="videoMusic">背景音乐</label>
-                        <!-- ✅ 新增: oninput 触发标题更新 -->
                         <input type="text" id="videoMusic" placeholder="例如: Treasure" oninput="updateAutoTitle()">
                     </div>
                     <div class="form-group" style="flex: 1;">
                         <label for="videoChoreographer">编舞师 (可选)</label>
-                        <!-- ✅ 新增: 编舞师字段 -->
                         <input type="text" id="videoChoreographer" placeholder="输入编舞师姓名" oninput="updateAutoTitle()">
                     </div>
                 </div>
                 
                 <div class="form-group">
-                    <label>选择视频文件 <span style="color:red">*</span></label>                
-                <div class="form-group">
                     <label for="videoDescription">描述</label>
                     <textarea id="videoDescription" rows="3" placeholder="描述一下这支舞蹈..."></textarea>
                 </div>
+
                 <div class="form-group">
                     <label>选择视频文件</label>
                     <div class="file-upload" onclick="document.getElementById('videoFile').click()">
                         <p>📹 点击选择视频文件</p>
                         <p style="font-size: 12px; color: #999; margin-top: 10px;">支持 MP4, AVI, MOV 格式</p>
-                        <input type="file" id="videoFile" accept="video/*" required onchange="displayFileName()">
+                        <input type="file" id="videoFile" accept="video/*" onchange="displayFileName()" style="display: none;">
                         <p id="fileName" style="margin-top: 10px; color: #667eea;"></p>
                     </div>
                 </div>
+
                 <!-- 上传进度条 -->
                 <div id="uploadProgress" style="display: none; margin-bottom: 20px;">
                     <div style="background: #e0e0e0; border-radius: 10px; overflow: hidden; height: 30px;">
@@ -257,8 +354,8 @@
     </div>
     
     <!-- 引入 JS 文件 -->
-    <script src="/static/js/utils.js"></script>
-    <script src="/static/js/api.js"></script>
+    <script src="/static/js/utils.js?v=2"></script>
+    <script src="/static/js/api.js?v=2"></script>
     <script>
         // 初始化
         window.onload = function() {
@@ -268,7 +365,6 @@
             }
         };
         
-        // 切换认证标签
         function switchAuthTab(tabName) {
             document.querySelectorAll('.auth-tabs .tab').forEach(tab => tab.classList.remove('active'));
             event.target.classList.add('active');
@@ -277,7 +373,6 @@
             document.getElementById(tabName + 'Tab').classList.add('show');
         }
         
-        // 切换主标签
         function switchMainTab(tabName) {
             document.querySelectorAll('#mainTabs .tab').forEach(tab => tab.classList.remove('active'));
             event.target.classList.add('active');
@@ -290,155 +385,259 @@
             }
         }
         
-        // 更新认证UI
         function updateAuthUI() {
             const userInfo = document.getElementById('userInfo');
+            const searchContainer = document.getElementById('searchContainer');
             const authSection = document.getElementById('authSection');
             const mainTabs = document.getElementById('mainTabs');
             const currentUser = DanceMirrorAPI.getCurrentUser() || { phone: "用户" };
             
             if (DanceMirrorAPI.isLoggedIn() && currentUser) {
                 userInfo.classList.add('show');
+                if(searchContainer) searchContainer.style.display = 'block';
                 document.getElementById('userPhone').textContent = currentUser.phone || currentUser.email || '用户';
                 authSection.style.display = 'none';
                 mainTabs.style.display = 'flex';
                 document.getElementById('videosTab').style.display = 'block';
             } else {
                 userInfo.classList.remove('show');
+                if(searchContainer) searchContainer.style.display = 'none';
                 authSection.style.display = 'block';
                 mainTabs.style.display = 'none';
                 document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
             }
         }
         
-        // 处理登录
         async function handleLogin(event) {
             event.preventDefault();
-            
             const phone = document.getElementById('loginPhone').value;
             const password = document.getElementById('loginPassword').value;
-            
-            // 验证手机号格式
-            if (!/^1[3-9]\d{9}$/.test(phone)) {
-                Utils.showMessage('loginMessage', '请输入正确的手机号', 'error');
-                return;
-            }
-            
+             if (!/^1[3-9]\d{9}$/.test(phone)) { Utils.showMessage('loginMessage', '请输入正确的手机号', 'error'); return; }
             try {
                 await DanceMirrorAPI.login(phone, password);
                 Utils.showMessage('loginMessage', '登录成功！', 'success');
-                updateAuthUI();
-                loadVideos();
-            } catch (error) {
-                Utils.showMessage('loginMessage', '登录失败: ' + error.message, 'error');
-            }
+                updateAuthUI(); loadVideos();
+            } catch (error) { Utils.showMessage('loginMessage', '登录失败: ' + error.message, 'error'); }
         }
         
-        // 处理注册
         async function handleRegister(event) {
             event.preventDefault();
-            
             const phone = document.getElementById('registerPhone').value;
             const firstName = document.getElementById('registerFirstName').value;
             const lastName = document.getElementById('registerLastName').value;
             const password = document.getElementById('registerPassword').value;
-            
-            // 验证手机号格式
-            if (!/^1[3-9]\d{9}$/.test(phone)) {
-                Utils.showMessage('registerMessage', '请输入正确的手机号', 'error');
-                return;
-            }
-            
-            // 验证密码
+             if (!/^1[3-9]\d{9}$/.test(phone)) { Utils.showMessage('registerMessage', '请输入正确的手机号', 'error'); return; }
             const passwordCheck = Utils.validatePassword(password);
-            if (!passwordCheck.valid) {
-                Utils.showMessage('registerMessage', passwordCheck.message, 'error');
-                return;
-            }
-            
+            if (!passwordCheck.valid) { Utils.showMessage('registerMessage', passwordCheck.message, 'error'); return; }
             try {
                 await DanceMirrorAPI.register(phone, firstName, lastName, password);
                 Utils.showMessage('registerMessage', '注册成功！正在跳转...', 'success');
-                updateAuthUI();
-                loadVideos();
-            } catch (error) {
-                Utils.showMessage('registerMessage', '注册失败: ' + error.message, 'error');
-            }
+                updateAuthUI(); loadVideos();
+            } catch (error) { Utils.showMessage('registerMessage', '注册失败: ' + error.message, 'error'); }
         }
         
-        // 处理退出登录
         function handleLogout() {
             DanceMirrorAPI.logout();
             updateAuthUI();
             Utils.showMessage('loginMessage', '已退出登录', 'success');
         }
+
+        // ================== 视频库：分组横向滚动布局 + 搜索 ==================
         
-        // 加载视频列表
+        let allVideosData = [];
+        let searchTimeout;
+
         async function loadVideos() {
-            const listEl = document.getElementById('videoList');
+            const container = document.getElementById('videoListContainer');
             const loadingEl = document.getElementById('videosLoading');
             
             loadingEl.style.display = 'block';
-            listEl.innerHTML = '';
+            container.innerHTML = '';
             
             try {
                 const videos = await DanceMirrorAPI.getVideos();
                 loadingEl.style.display = 'none';
                 
-                if (videos && videos.length > 0) {
-                    videos.forEach(video => {
-                        listEl.appendChild(createVideoCard(video));
-                    });
+                allVideosData = videos || [];
+                
+                if (allVideosData.length > 0) {
+                    renderGroupedVideos(allVideosData);
                 } else {
-                    listEl.innerHTML = '<p style="text-align:center;color:#666;">暂无视频，快去上传第一个视频吧！</p>';
+                    container.innerHTML = '<p style="text-align:center;color:#666;margin-top:20px;">暂无视频，快去上传第一个视频吧！</p>';
                 }
             } catch (error) {
                 loadingEl.style.display = 'none';
                 Utils.showMessage('videosMessage', '加载失败: ' + error.message, 'error');
             }
         }
+
+        function executeSearch(query) {
+            // 1. 如果没有关键词，恢复默认的"泳道"分类视图
+            if (!query) {
+                renderGroupedVideos(allVideosData);
+                return;
+            }
+
+            const lowerQuery = query.toLowerCase();
+            const container = document.getElementById('videoListContainer');
+            
+            // 2. 在本地数据中过滤
+            const filteredVideos = allVideosData.filter(video => {
+                const title = (video.title || '').toLowerCase();
+                const desc = (video.description || '').toLowerCase();
+                // 提取舞种也加入搜索
+                const genre = extractGenre(video.description).toLowerCase();
+                
+                // 只要标题、描述或舞种包含关键词
+                return title.includes(lowerQuery) || 
+                       desc.includes(lowerQuery) || 
+                       genre.includes(lowerQuery);
+            });
+
+            // 3. 按时间倒序排列 (最新的在前)
+            filteredVideos.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+            // 4. 渲染结果
+            renderSearchResults(filteredVideos, query);
+        }
+
+        // 绑定到 oninput：防抖
+        function handleSearch() {
+            const query = document.getElementById('searchInput').value.trim();
+            if(!query) {
+                clearTimeout(searchTimeout);
+                renderGroupedVideos(allVideosData);
+                return;
+            }
+
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                executeSearch(query);
+            }, 500); // 500ms 自动搜索
+        }
+
+        // 绑定到 onkeydown: 回车立即搜索
+        function handleEnter(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                clearTimeout(searchTimeout);
+                const query = document.getElementById('searchInput').value.trim();
+                executeSearch(query);
+                document.getElementById('searchInput').blur();
+            }
+        }
+
+        function renderSearchResults(videos, query) {
+            const container = document.getElementById('videoListContainer');
+            container.innerHTML = '';
+
+            const header = document.createElement('div');
+            header.className = 'search-header';
+            header.innerHTML = videos.length > 0 
+                ? `🔍 "${query}" 的搜索结果 (${videos.length}个，按相关度/时间排序)` 
+                : `😔 未找到与 "${query}" 相关的视频`;
+            container.appendChild(header);
+
+            if (videos.length === 0) return;
+
+            const grid = document.createElement('div');
+            grid.className = 'search-results-grid';
+
+            videos.forEach(video => {
+                const card = createVideoCard(video);
+                grid.appendChild(card);
+            });
+
+            container.appendChild(grid);
+        }        
+
+        function extractGenre(description) {
+            if (!description) return '其他';
+            const match = description.match(/【舞种:\s*([^】]+)】/);
+            return match ? match[1].trim() : '其他';
+        }
+
+        function renderGroupedVideos(videos) {
+            const container = document.getElementById('videoListContainer');
+            container.innerHTML = '';
+
+            const groups = {};
+            videos.forEach(video => {
+                const genre = extractGenre(video.description);
+                if (!groups[genre]) {
+                    groups[genre] = [];
+                }
+                groups[genre].push(video);
+            });
+
+            const sortedGenres = Object.keys(groups).sort((a, b) => {
+                if (a === '其他') return 1;
+                if (b === '其他') return -1;
+                return a.localeCompare(b);
+            });
+
+            sortedGenres.forEach(genre => {
+                const genreSection = document.createElement('div');
+                genreSection.className = 'genre-section';
+
+                const header = document.createElement('h2');
+                header.className = 'genre-header';
+                header.innerHTML = `${genre}`;
+                
+                const row = document.createElement('div');
+                row.className = 'video-row';
+
+                groups[genre].forEach(video => {
+                    row.appendChild(createVideoCard(video));
+                });
+
+                genreSection.appendChild(header);
+                genreSection.appendChild(row);
+                container.appendChild(genreSection);
+            });
+        }
         
-        // 创建视频卡片
         function createVideoCard(video) {
             const card = document.createElement('div');
             card.className = 'video-card';
             
-            const title = document.createElement('h3');
-            title.textContent = video.title;
-            
-            const desc = document.createElement('p');
-            desc.textContent = video.description || '暂无描述';
-            
             const videoEl = document.createElement('video');
-            // 从 /app/uploads/xxx.mp4 转换为 /uploads/xxx.mp4
             const videoPath = video.filePath.replace('/app/uploads/', '/uploads/');
             videoEl.src = videoPath;
-            videoEl.controls = true;
+            videoEl.controls = true; 
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'video-card-content';
+
+            const title = document.createElement('h3');
+            title.textContent = video.title;
+            title.title = video.title;
+
+            const metaDiv = document.createElement('div');
+            metaDiv.className = 'meta-info';
             
-            const date = document.createElement('p');
-            date.style.fontSize = '12px';
-            date.style.color = '#999';
-            date.textContent = Utils.formatDate(video.createdAt);
-            
+            const dateSpan = document.createElement('span');
+            dateSpan.textContent = Utils.formatDate(video.createdAt).split(' ')[0];
+
             const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'delete-btn-link';
             deleteBtn.textContent = '删除';
-            deleteBtn.style.background = '#dc3545';
-            deleteBtn.style.marginTop = '10px';
             deleteBtn.onclick = () => deleteVideo(video.id);
-            
-            card.appendChild(title);
-            card.appendChild(desc);
+
+            metaDiv.appendChild(dateSpan);
+            metaDiv.appendChild(deleteBtn);
+
+            contentDiv.appendChild(title);
+            contentDiv.appendChild(metaDiv);
+
             card.appendChild(videoEl);
-            card.appendChild(date);
-            card.appendChild(deleteBtn);
+            card.appendChild(contentDiv);
             
             return card;
         }
         
-        // 删除视频
         async function deleteVideo(id) {
             if (!confirm('确定要删除这个视频吗？')) return;
-            
             try {
                 await DanceMirrorAPI.deleteVideo(id);
                 Utils.showMessage('videosMessage', '删除成功', 'success');
@@ -447,12 +646,13 @@
                 Utils.showMessage('videosMessage', '删除失败: ' + error.message, 'error');
             }
         }
-        // 标题状态标记与自动生成逻辑
+
+        // ================== 上传 & 自动标题逻辑 ==================
+
         let isTitleManuallyEdited = false;
 
         function markTitleDirty() {
             const val = document.getElementById('videoTitle').value;
-            // 如果用户清空了标题，视为放弃手动修改，恢复由于字段变动触发的自动模式
             if (!val || val.trim() === '') {
                 isTitleManuallyEdited = false;
                 updateAutoTitle();
@@ -465,98 +665,54 @@
             if (isTitleManuallyEdited) return;
 
             const genreSelect = document.getElementById('videoGenre');
-            // 只取舞种英文名（如 "Jazz 爵士" -> "Jazz"）
             const genre = genreSelect.value ? genreSelect.options[genreSelect.selectedIndex].text.split(' ')[0] : '';
             const music = document.getElementById('videoMusic').value.trim();
             const choreo = document.getElementById('videoChoreographer').value.trim();
             
-            // 获取当前日期 YYMMDD
             const now = new Date();
             const dateStr = now.getFullYear().toString().substr(2) + 
                             (now.getMonth()+1).toString().padStart(2, '0') + 
                             now.getDate().toString().padStart(2, '0');
 
-            // 格式：音乐 - XX编舞（若有） - 舞种 - 日期
             let parts = [];
-            
-            // 1. 音乐 (默认为 '练习视频')
             parts.push(music || '练习视频');
-
-            // 2. 编舞
-            if (choreo) {
-                parts.push(choreo + '编舞');
-            }
-
-            // 3. 舞种
-            if (genre) {
-                parts.push(genre);
-            }
-
-            // 4. 日期
+            if (choreo) parts.push(choreo + '编舞');
+            if (genre) parts.push(genre);
             parts.push(dateStr);
 
             document.getElementById('videoTitle').value = parts.join('-');
         }
 
-        // 显示文件名
         function displayFileName() {
             const file = document.getElementById('videoFile').files[0];
             const fileNameEl = document.getElementById('fileName');
-            
             if (file) {
                 fileNameEl.textContent = `已选择: ${file.name} (${Utils.formatFileSize(file.size)})`;
             }
         }
         
-        // 处理视频上传
         async function handleUpload(event) {
             event.preventDefault();
-
-            // 0. 获取标题
-            if (!isTitleManuallyEdited) {
-                updateAutoTitle();
-            }
+            if (!isTitleManuallyEdited) { updateAutoTitle(); }
             
             const title = document.getElementById('videoTitle').value;
-            // 1. 获取新字段的值
             const genre = document.getElementById('videoGenre').value;
             const music = document.getElementById('videoMusic').value.trim();
             const rawDescription = document.getElementById('videoDescription').value;
-
-            const fileInput = document.getElementById('videoFile');
-            const file = fileInput ? fileInput.files[0] : null; 
+            const file = document.getElementById('videoFile').files[0];
             
-            // 基础校验
-            if (!title.trim()) {
-                Utils.showMessage('uploadMessage', '请输入视频标题', 'error');
-                return;
-            }
+            if (!title.trim() || !file) { Utils.showMessage('uploadMessage', '信息不完整', 'error'); return; }
 
-            if (!file) {
-                Utils.showMessage('uploadMessage', '请选择视频文件', 'error');
-                return;
-            }
-
-            // ... (保持原有的文件类型和大小校验逻辑不变) ...
             const validTypes = ['video/mp4', 'video/mpeg', 'video/quicktime', 'video/x-msvideo', 'video/x-ms-wmv', 'video/webm', 'video/x-matroska'];
             const isVideoExtension = /\.(mp4|mov|avi|wmv|webm|mkv|m4v)$/i.test(file.name);
-            if (!validTypes.includes(file.type) && !isVideoExtension) {
-                Utils.showMessage('uploadMessage', '文件格式不支持', 'error');
-                return;
-            }
-            if (file.size > 524288000) {
-                Utils.showMessage('uploadMessage', '文件太大', 'error');
-                return;
-            }
+            if (!validTypes.includes(file.type) && !isVideoExtension) { Utils.showMessage('uploadMessage', '文件格式不支持', 'error'); return; }
+            if (file.size > 524288000) { Utils.showMessage('uploadMessage', '文件太大', 'error'); return; }
 
-            // 2. 构造包含元数据的最终描述
-            // 格式：【舞种: Jazz】\n【音乐: Song Name】\n用户原本的描述
             let finalDescription = "";
             if (genre) finalDescription += `【舞种: ${genre}】\n`;
             if (music) finalDescription += `【音乐: ${music}】\n`;
             if (rawDescription.trim()) finalDescription += `\n${rawDescription.trim()}`;
 
-            // 开始上传 UI 状态
             const uploadBtn = document.getElementById('uploadBtn');
             const progressDiv = document.getElementById('uploadProgress');
             const progressBar = document.getElementById('progressBar');
@@ -569,27 +725,20 @@
             progressText.textContent = '0%';
             
             try {
-                // 3. 提交 finalDescription 而不是 rawDescription
                 await DanceMirrorAPI.uploadVideo({
                     title: title, 
-                    description: finalDescription.trim(), // 使用拼接好的描述
+                    description: finalDescription.trim(),
                     file: file
                 }, (percent) => {
                     const rounded = Math.round(percent);
                     progressBar.style.width = rounded + '%';
                     progressText.textContent = rounded + '%';
                 });
-                
                 Utils.showMessage('uploadMessage', '上传成功！', 'success');
-                
-                // 重置表单
                 event.target.reset();
                 document.getElementById('fileName').textContent = '';
-                // 重置标题编辑状态
                 isTitleManuallyEdited = false;
                 progressDiv.style.display = 'none';
-                
-                // 刷新视频列表
                 setTimeout(() => {
                     switchMainTab('videos');
                     const firstTab = document.querySelector('#mainTabs .tab:first-child');

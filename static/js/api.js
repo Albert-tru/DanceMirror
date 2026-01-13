@@ -190,6 +190,11 @@ const DanceMirrorAPI = (function() {
             }
         },
 
+        // ✅ 新增：后端搜索接口
+        searchVideos: async function(query) {
+            return await request(`/videos/search?q=${encodeURIComponent(query)}`, { method: 'GET' });
+        },
+
         // 删除视频
         deleteVideo: async function(id) {
             return await request(`/videos/${id}`, { method: 'DELETE' });
