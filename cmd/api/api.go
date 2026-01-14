@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Albert-tru/DanceMirror/pkg/observability"
 	"github.com/Albert-tru/DanceMirror/service/cache"
 	"github.com/Albert-tru/DanceMirror/service/mq"
 	"github.com/Albert-tru/DanceMirror/service/search"
@@ -20,6 +21,7 @@ import (
 	"github.com/Albert-tru/DanceMirror/service/user"
 	"github.com/Albert-tru/DanceMirror/service/video"
 	"github.com/gorilla/mux"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"gorm.io/gorm"
 )
 
@@ -55,8 +57,9 @@ func (s *APIServer) Run() error {
 
 	// 全局中间件：Request ID、日志、体积限制等
 	router.Use(s.requestIDMiddleware)
-	router.Use(s.loggingMiddleware)
+	router.Use(observability.ObservabilityMiddleware)
 	router.Use(limitBodyMiddleware(500 * 1024 * 1024)) // 500MB
+	router.Handle("/metrics", promhttp.Handler())      // Prometheus 指标路由
 
 	subrouter := router.PathPrefix("/api/v1").Subrouter()
 

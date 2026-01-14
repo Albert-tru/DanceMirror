@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"log"
 	"time"
@@ -8,6 +9,7 @@ import (
 	"github.com/Albert-tru/DanceMirror/cmd/api"
 	"github.com/Albert-tru/DanceMirror/config"
 	"github.com/Albert-tru/DanceMirror/db"
+	"github.com/Albert-tru/DanceMirror/pkg/observability"
 	"github.com/Albert-tru/DanceMirror/service/cache"
 	"github.com/Albert-tru/DanceMirror/service/mq"
 	"github.com/Albert-tru/DanceMirror/service/search"
@@ -19,6 +21,21 @@ import (
 const QueueName = "video_crop_queue"
 
 func main() {
+	// 初始化观测性工具
+	observability.InitLogger()
+	// 生产环境通常从环境变量读取 Service Name
+	tp, err := observability.InitTracer("dance-mirror-backend")
+	if err != nil {
+		log.Fatalf("❌ Failed to init tracer: %v", err)
+	}
+	// 确保在程序退出前刷新 Trace 数据上报
+	defer func() {
+		if err := tp.Shutdown(context.Background()); err != nil {
+			log.Printf("Error shutting down tracer provider: %v", err)
+		}
+	}()
+	log.Println("✅ Observability (Logger & Tracer) initialized")
+
 	// 1. 连接数据库
 	database, err := db.NewMySQLStorage(config.Envs)
 	if err != nil {

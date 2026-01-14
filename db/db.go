@@ -12,6 +12,7 @@ import (
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+	"gorm.io/plugin/opentelemetry/tracing"
 )
 
 // NewMySQLStorage 创建并返回一个 MySQL 数据库连接
@@ -41,6 +42,11 @@ func NewMySQLStorage(cfg config.Config) (*gorm.DB, error) {
 		},
 	})
 	if err != nil {
+		return nil, err
+	}
+
+	// ✅ 修正位置：在连接成功后注册 OpenTelemetry 插件
+	if err := db.Use(tracing.NewPlugin()); err != nil {
 		return nil, err
 	}
 

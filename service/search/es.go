@@ -28,7 +28,7 @@ func NewESClient(address string) (*ESClient, error) {
 }
 
 // IndexVideo 将视频数据写入/更新到 ES
-func (s *ESClient) IndexVideo(video *types.Video) error {
+func (s *ESClient) IndexVideo(ctx context.Context, video *types.Video) error {
 	body, err := json.Marshal(video)
 	if err != nil {
 		return err
@@ -41,7 +41,7 @@ func (s *ESClient) IndexVideo(video *types.Video) error {
 		Refresh:    "true", // 开发环境为了立即搜索到，生产环境可去掉
 	}
 
-	res, err := req.Do(context.Background(), s.client)
+	res, err := req.Do(ctx, s.client)
 	if err != nil {
 		return err
 	}
@@ -54,7 +54,7 @@ func (s *ESClient) IndexVideo(video *types.Video) error {
 }
 
 // SearchVideos 核心搜索逻辑
-func (s *ESClient) SearchVideos(query string, page, pageSize int) ([]int, error) {
+func (s *ESClient) SearchVideos(ctx context.Context, query string, page, pageSize int) ([]int, error) {
 	var buf bytes.Buffer
 
 	// 构建 ES 查询 DSL
@@ -75,7 +75,7 @@ func (s *ESClient) SearchVideos(query string, page, pageSize int) ([]int, error)
 	}
 
 	res, err := s.client.Search(
-		s.client.Search.WithContext(context.Background()),
+		s.client.Search.WithContext(ctx),
 		s.client.Search.WithIndex(s.index),
 		s.client.Search.WithBody(&buf),
 		s.client.Search.WithTrackTotalHits(true),

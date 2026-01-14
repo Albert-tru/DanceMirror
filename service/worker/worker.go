@@ -11,9 +11,9 @@ import (
 
 	"github.com/Albert-tru/DanceMirror/config"
 	"github.com/Albert-tru/DanceMirror/service/mq"
+	"github.com/Albert-tru/DanceMirror/service/search"
 	"github.com/Albert-tru/DanceMirror/service/storage"
 	"github.com/Albert-tru/DanceMirror/service/video"
-"github.com/Albert-tru/DanceMirror/service/search"
 	"github.com/Albert-tru/DanceMirror/types"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"gorm.io/gorm"
@@ -178,7 +178,7 @@ func (w *CropWorker) saveCroppedVideoRecord(originalVideoID int, newPath string)
 	return nil
 }
 
-func StartESWorker(mqClient *mq.RabbitMQClient, esClient *search.ESClient, videoStore types.VideoStore) {
+func StartESWorker(mqClient *mq.RabbitMQClient, esClient *search.ESClient, videoStore video.Store) {
 	msgs, err := mqClient.Consume("video_sync_es_queue")
 	if err != nil {
 		log.Fatal(err)
@@ -191,10 +191,10 @@ func StartESWorker(mqClient *mq.RabbitMQClient, esClient *search.ESClient, video
 
 			if msg.Action == "index" {
 				// 从 DB 读取最新完整数据
-				v, err := videoStore.GetVideoByID(msg.VideoID)
+				v, err := videoStore.GetVideoByID(context.Background(), msg.VideoID)
 				if err == nil {
 					// 写入 ES
-					esClient.IndexVideo(v)
+					esClient.IndexVideo(context.Background(), v)
 				}
 			}
 			d.Ack(false)

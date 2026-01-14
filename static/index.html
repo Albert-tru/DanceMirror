@@ -191,7 +191,31 @@
         .search-results-grid .video-card {
             width: 100%;
             min-width: unset;
-        }      
+        }
+
+        /* ✅ 搜索结果分页控件 */
+        .pagination {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            justify-content: center;
+            margin: 10px 0 20px;
+        }
+        .pagination button, .pagination select {
+            padding: 6px 10px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            background: white;
+            cursor: pointer;
+        }
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .pagination .info {
+            color: #64748b;
+            font-size: 13px;
+        }
     </style>
 </head>
 <body>
@@ -283,6 +307,7 @@
             <div class="message" id="videosMessage"></div>
             <div class="loading" id="videosLoading">加载中</div>
             <div id="videoListContainer"></div>
+            <div id="pagination" class="pagination" style="display: none;"></div>
         </div>
         
         <!-- 上传视频 -->
@@ -354,8 +379,8 @@
     </div>
     
     <!-- 引入 JS 文件 -->
-    <script src="/static/js/utils.js?v=2"></script>
-    <script src="/static/js/api.js?v=2"></script>
+    <script src="/static/js/utils.js"></script>
+    <script src="/static/js/api.js"></script>
     <script>
         // 初始化
         window.onload = function() {
@@ -446,6 +471,14 @@
         
         let allVideosData = [];
         let searchTimeout;
+        // ✅ 前端分页状态（优先尝试服务端分页，失败则回退本地）
+        const SearchState = {
+            query: '',
+            page: 1,
+            size: 20,
+            total: 0,
+            sort: 'date_desc'
+        };
 
         async function loadVideos() {
             const container = document.getElementById('videoListContainer');
@@ -471,34 +504,64 @@
             }
         }
 
-        function executeSearch(query) {
-            // 1. 如果没有关键词，恢复默认的"泳道"分类视图
+        // ✅ 核心搜索逻辑
+        async function executeSearch(query, page = 1) {
             if (!query) {
+                SearchState.query = '';
+                SearchState.page = 1;
+                SearchState.total = 0;
+                document.getElementById('pagination').style.display = 'none';
                 renderGroupedVideos(allVideosData);
                 return;
             }
 
-            const lowerQuery = query.toLowerCase();
+            SearchState.query = query;
+            SearchState.page = page;
+
             const container = document.getElementById('videoListContainer');
-            
-            // 2. 在本地数据中过滤
-            const filteredVideos = allVideosData.filter(video => {
-                const title = (video.title || '').toLowerCase();
-                const desc = (video.description || '').toLowerCase();
-                // 提取舞种也加入搜索
-                const genre = extractGenre(video.description).toLowerCase();
-                
-                // 只要标题、描述或舞种包含关键词
-                return title.includes(lowerQuery) || 
-                       desc.includes(lowerQuery) || 
-                       genre.includes(lowerQuery);
-            });
+            if (container) {
+                container.innerHTML = '<div style="text-align:center;padding:20px;color:#666;">🔍 正在搜索...</div>';
+            }
 
-            // 3. 按时间倒序排列 (最新的在前)
-            filteredVideos.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            try {
+                const { items, total } = await fetchSearchResults(query, SearchState.page, SearchState.size, SearchState.sort);
+                SearchState.total = total ?? (Array.isArray(items) ? items.length : 0);
+                renderSearchResults(items, query, SearchState.total);
+                renderPagination();
+            } catch (error) {
+                console.error('搜索出错:', error);
+                if (container) {
+                    container.innerHTML = `<p style="text-align:center;color:red;">搜索失败: ${error.message}</p>`;
+                }
+                document.getElementById('pagination').style.display = 'none';
+            }
+        }
 
-            // 4. 渲染结果
-            renderSearchResults(filteredVideos, query);
+        // ✅ 优先尝试服务端分页；不支持则回退为本地数组分页
+        async function fetchSearchResults(query, page, size, sort) {
+            try {
+                // 尝试调用支持分页的后端 API（若 api.js 已实现）
+                const res = await DanceMirrorAPI.searchVideos(query, { page, size, sort });
+                if (Array.isArray(res)) {
+                    // 仅返回数组：视为无分页支持
+                    const start = (page - 1) * size;
+                    const items = res.slice(start, start + size);
+                    return { items, total: res.length };
+                }
+                if (res && (res.items || res.data)) {
+                    return { items: res.items || res.data, total: res.total ?? (res.items || res.data).length };
+                }
+                // 兜底：未知结构时转数组
+                const arr = res ? [].concat(res) : [];
+                const start = (page - 1) * size;
+                return { items: arr.slice(start, start + size), total: arr.length };
+            } catch (e) {
+                // 如果 api.js 不支持该签名，退回到旧签名并在前端分页
+                const res = await DanceMirrorAPI.searchVideos(query);
+                const arr = Array.isArray(res) ? res : (res ? [].concat(res) : []);
+                const start = (page - 1) * size;
+                return { items: arr.slice(start, start + size), total: arr.length };
+            }
         }
 
         // 绑定到 oninput：防抖
@@ -507,12 +570,13 @@
             if(!query) {
                 clearTimeout(searchTimeout);
                 renderGroupedVideos(allVideosData);
+                document.getElementById('pagination').style.display = 'none';
                 return;
             }
 
             clearTimeout(searchTimeout);
             searchTimeout = setTimeout(() => {
-                executeSearch(query);
+                executeSearch(query, 1);
             }, 500); // 500ms 自动搜索
         }
 
@@ -522,19 +586,20 @@
                 event.preventDefault();
                 clearTimeout(searchTimeout);
                 const query = document.getElementById('searchInput').value.trim();
-                executeSearch(query);
+                executeSearch(query, 1);
                 document.getElementById('searchInput').blur();
             }
         }
 
-        function renderSearchResults(videos, query) {
+        function renderSearchResults(videos, query, total = 0) {
             const container = document.getElementById('videoListContainer');
             container.innerHTML = '';
 
             const header = document.createElement('div');
             header.className = 'search-header';
+            const count = total || videos.length;
             header.innerHTML = videos.length > 0 
-                ? `🔍 "${query}" 的搜索结果 (${videos.length}个，按相关度/时间排序)` 
+                ? `🔍 "${query}" 的搜索结果 (${count}个，按相关度/时间排序)` 
                 : `😔 未找到与 "${query}" 相关的视频`;
             container.appendChild(header);
 
@@ -549,7 +614,53 @@
             });
 
             container.appendChild(grid);
+            // 若为搜索结果，分页容器显示由 renderPagination 控制
         }        
+
+        function renderPagination() {
+            const pager = document.getElementById('pagination');
+            const totalPages = Math.max(1, Math.ceil((SearchState.total || 0) / SearchState.size));
+            if (!SearchState.query || SearchState.total <= SearchState.size) {
+                pager.style.display = 'none';
+                pager.innerHTML = '';
+                return;
+            }
+            pager.style.display = 'flex';
+            const page = SearchState.page;
+
+            pager.innerHTML = '';
+            const prev = document.createElement('button');
+            prev.textContent = '上一页';
+            prev.disabled = page <= 1;
+            prev.onclick = () => executeSearch(SearchState.query, page - 1);
+
+            const next = document.createElement('button');
+            next.textContent = '下一页';
+            next.disabled = page >= totalPages;
+            next.onclick = () => executeSearch(SearchState.query, page + 1);
+
+            const info = document.createElement('span');
+            info.className = 'info';
+            info.textContent = `第 ${page} / ${totalPages} 页 · 共 ${SearchState.total} 条`;
+
+            const sizeSel = document.createElement('select');
+            ;[10,20,30,50].forEach(sz => {
+                const opt = document.createElement('option');
+                opt.value = sz;
+                opt.textContent = sz + '/页';
+                if (sz === SearchState.size) opt.selected = true;
+                sizeSel.appendChild(opt);
+            });
+            sizeSel.onchange = () => {
+                SearchState.size = parseInt(sizeSel.value, 10);
+                executeSearch(SearchState.query, 1);
+            };
+
+            pager.appendChild(prev);
+            pager.appendChild(info);
+            pager.appendChild(sizeSel);
+            pager.appendChild(next);
+        }
 
         function extractGenre(description) {
             if (!description) return '其他';

@@ -1,6 +1,7 @@
 package types
 
 import (
+	"context"
 	"time"
 
 	"gorm.io/gorm"
@@ -97,12 +98,13 @@ type UserStore interface {
 
 // VideoStore 视频存储接口
 type VideoStore interface {
-	GetVideos(userID int) ([]*Video, error)
-	GetVideoByID(id int) (*Video, error)
-	CreateVideo(video *Video) error
-	UpdateVideo(video *Video) error
-GetVideosByIDs(ids []int) ([]*Video, error)
-	DeleteVideo(id int) error
+	GetVideos(ctx context.Context, userID int) ([]*Video, error)
+	GetVideoByID(ctx context.Context, id int) (*Video, error)
+	CreateVideo(ctx context.Context, video *Video) error
+	UpdateVideo(ctx context.Context, video *Video) error
+	GetVideosByIDs(ctx context.Context, ids []int) ([]*Video, error)
+	SearchVideos(ctx context.Context, keyword string, page, size int, sort string) ([]*Video, int64, error)
+	DeleteVideo(ctx context.Context, id int) error
 }
 
 // PracticeStore 练习记录存储接口
@@ -115,8 +117,8 @@ type PracticeStore interface {
 
 // CropParams 视频裁剪参数
 type CropParams struct {
-X      int `json:"x"`
-Y      int `json:"y"`
-Width  int `json:"width"`
-Height int `json:"height"`
+	X      int `json:"x"`
+	Y      int `json:"y"`
+	Width  int `json:"width"`
+	Height int `json:"height"`
 }

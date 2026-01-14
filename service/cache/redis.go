@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Albert-tru/DanceMirror/types"
+	"github.com/redis/go-redis/extra/redisotel/v9"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -29,6 +30,11 @@ func NewRedisClient(addr string, password string, db int) *RedisClient {
 	ctx := context.Background() //返回一个非 nil 的空上下文
 	if err := client.Ping(ctx).Err(); err != nil {
 		panic("❌ Redis 连接失败: " + err.Error())
+	}
+
+	// 注册 OpenTelemetry 追踪
+	if err := redisotel.InstrumentTracing(client); err != nil {
+		fmt.Printf("⚠️ Redis Tracing setup failed: %v\n", err)
 	}
 
 	fmt.Println("✅ Redis 连接成功!")

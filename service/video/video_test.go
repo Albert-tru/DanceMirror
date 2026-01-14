@@ -1,6 +1,7 @@
 package video
 
 import (
+	"context"
 	"testing"
 
 	"github.com/Albert-tru/DanceMirror/types"
@@ -46,7 +47,7 @@ func TestVideoStore_Integration(t *testing.T) {
 			Title:    "我的第一支舞",
 			FilePath: "p", FileName: "f", FileSize: 1,
 		}
-		err := store.CreateVideo(video)
+		err := store.CreateVideo(context.Background(), video)
 		assert.NoError(t, err)
 		assert.NotZero(t, video.ID)
 
@@ -63,14 +64,14 @@ func TestVideoStore_Integration(t *testing.T) {
 		db.Create(video)
 		t.Cleanup(func() { db.Unscoped().Delete(video) }) // 保证清理
 
-		retrieved, err := store.GetVideoByID(video.ID)
+		retrieved, err := store.GetVideoByID(context.Background(), video.ID)
 		assert.NoError(t, err)
 		assert.NotNil(t, retrieved)
 		assert.Equal(t, video.ID, retrieved.ID)
 	})
 
 	t.Run("should return error for non-existent video ID", func(t *testing.T) {
-		_, err := store.GetVideoByID(999999)
+		_, err := store.GetVideoByID(context.Background(), 999999)
 		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 	})
 
@@ -86,7 +87,7 @@ func TestVideoStore_Integration(t *testing.T) {
 		t.Cleanup(func() { db.Unscoped().Delete(&videosToCreate) }) // 清理这3个视频
 
 		// ⭐ 2. 执行查询
-		videos, err := store.GetVideos(testUser.ID)
+		videos, err := store.GetVideos(context.Background(), testUser.ID)
 
 		// ⭐ 3. 断言
 		assert.NoError(t, err)
@@ -101,11 +102,11 @@ func TestVideoStore_Integration(t *testing.T) {
 		t.Cleanup(func() { db.Unscoped().Delete(video) }) // 确保物理删除
 
 		// ⭐ 2. 执行软删除
-		err := store.DeleteVideo(video.ID)
+		err := store.DeleteVideo(context.Background(), video.ID)
 		assert.NoError(t, err)
 
 		// ⭐ 3. 验证：普通查询应该找不到
-		_, err = store.GetVideoByID(video.ID)
+		_, err = store.GetVideoByID(context.Background(), video.ID)
 		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 
 		// ⭐ 4. 验证：使用 Unscoped 可以查到，并且 DeletedAt 不为 nil
@@ -127,10 +128,10 @@ func TestVideoStore_Integration(t *testing.T) {
 			// 没有 Description、Duration、Thumbnail
 		}
 
-		err := store.CreateVideo(video)
+		err := store.CreateVideo(context.Background(), video)
 		assert.NoError(t, err)
 
-		retrieved, _ := store.GetVideoByID(video.ID)
+		retrieved, _ := store.GetVideoByID(context.Background(), video.ID)
 		assert.Equal(t, "最小视频", retrieved.Title)
 		assert.Empty(t, retrieved.Description)
 		assert.Equal(t, 0.0, retrieved.Duration)
@@ -149,10 +150,10 @@ func TestVideoStore_Integration(t *testing.T) {
 			Duration:    3600.5,    // 1小时
 		}
 
-		err := store.CreateVideo(video)
+		err := store.CreateVideo(context.Background(), video)
 		assert.NoError(t, err)
 
-		retrieved, _ := store.GetVideoByID(video.ID)
+		retrieved, _ := store.GetVideoByID(context.Background(), video.ID)
 		assert.Equal(t, int64(524288000), retrieved.FileSize)
 		assert.Equal(t, 3600.5, retrieved.Duration)
 	})
@@ -180,7 +181,7 @@ func TestVideoStore_Integration(t *testing.T) {
 				FileName: "user1.mp4",
 				FileSize: 1000000,
 			}
-			store.CreateVideo(video)
+			store.CreateVideo(context.Background(), video)
 		}
 
 		// 为第二个用户创建 3 个视频
@@ -192,12 +193,12 @@ func TestVideoStore_Integration(t *testing.T) {
 				FileName: "user2.mp4",
 				FileSize: 2000000,
 			}
-			store.CreateVideo(video)
+			store.CreateVideo(context.Background(), video)
 		}
 
 		// 验证隔离性
-		user1Videos, _ := store.GetVideos(testUser.ID)
-		user2Videos, _ := store.GetVideos(user2.ID)
+		user1Videos, _ := store.GetVideos(context.Background(), testUser.ID)
+		user2Videos, _ := store.GetVideos(context.Background(), user2.ID)
 
 		assert.Equal(t, 2, len(user1Videos))
 		assert.Equal(t, 3, len(user2Videos))
@@ -219,7 +220,7 @@ func TestVideoStore_Integration(t *testing.T) {
 					FileSize:    1000000,
 					Duration:    60.0,
 				}
-				store.CreateVideo(video)
+				store.CreateVideo(context.Background(), video)
 				done <- true
 			}(i)
 		}
@@ -230,7 +231,7 @@ func TestVideoStore_Integration(t *testing.T) {
 		}
 
 		// 验证所有视频都被创建
-		videos, _ := store.GetVideos(testUser.ID)
+		videos, _ := store.GetVideos(context.Background(), testUser.ID)
 		assert.Equal(t, 10, len(videos))
 	})
 
@@ -276,7 +277,7 @@ func TestVideoStore_EdgeCases(t *testing.T) {
 			FileName: "long.mp4",
 			FileSize: 1000000,
 		}
-		err := store.CreateVideo(video)
+		err := store.CreateVideo(context.Background(), video)
 		// 可能会因为字段长度限制而失败
 		if err != nil {
 			t.Logf("预期的错误: %v", err)
@@ -292,10 +293,10 @@ func TestVideoStore_EdgeCases(t *testing.T) {
 			FileSize:    1000000,
 			Description: "包含特殊字符: !@#$%^&*()",
 		}
-		err := store.CreateVideo(video)
+		err := store.CreateVideo(context.Background(), video)
 		assert.NoError(t, err)
 
-		retrieved, _ := store.GetVideoByID(video.ID)
+		retrieved, _ := store.GetVideoByID(context.Background(), video.ID)
 		assert.Equal(t, "测试-视频_#1.mp4", retrieved.FileName)
 	})
 
@@ -308,15 +309,15 @@ func TestVideoStore_EdgeCases(t *testing.T) {
 			FileSize: 1000,
 			Duration: 0.0,
 		}
-		err := store.CreateVideo(video)
+		err := store.CreateVideo(context.Background(), video)
 		assert.NoError(t, err)
 
-		retrieved, _ := store.GetVideoByID(video.ID)
+		retrieved, _ := store.GetVideoByID(context.Background(), video.ID)
 		assert.Equal(t, 0.0, retrieved.Duration)
 	})
 
 	t.Run("should handle negative user ID", func(t *testing.T) {
-		videos, err := store.GetVideos(-1)
+		videos, err := store.GetVideos(context.Background(), -1)
 		assert.NoError(t, err) // 不应该报错，只是返回空列表
 		assert.Equal(t, 0, len(videos))
 	})

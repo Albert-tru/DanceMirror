@@ -8,7 +8,7 @@ const DanceMirrorAPI = (function() {
 
     // 配置
     const config = {
-        apiBase: '/api/v1', // ✅ 基础路径
+        apiBase: '/api/v1', // 基础路径
         tokenKey: 'token',
         userKey: 'user'
     };
@@ -111,12 +111,17 @@ const DanceMirrorAPI = (function() {
             return await request('/videos', { method: 'GET' });
         },
 
-        // ✅ 修复：使用 config.apiBase
+        // 调用后端es搜索接口
+        searchVideos: async function(query) {
+            return await request(`/videos/search?q=${encodeURIComponent(query)}`, { method: 'GET' });
+        },
+
+        // 使用 config.apiBase
         getVideo: async (videoId) => {
             return await request(`/videos/${videoId}`, { method: 'GET' });
         },
 
-        // ✅ 修复：使用 config.apiBase
+        // 使用 config.apiBase
         cropVideoCloud: async (videoId, params) => {
             return await request(`/videos/${videoId}/crop`, {
                 method: 'POST',
@@ -176,7 +181,7 @@ const DanceMirrorAPI = (function() {
                     xhr.addEventListener('error', () => {
                         reject(new Error('上传失败: 网络错误'));
                     });
-                    // ✅ 修复：使用 config.apiBase
+                    // 修复：使用 config.apiBase
                     xhr.open('POST', `${config.apiBase}/videos`);
                     const token = getToken();
                     if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
@@ -190,15 +195,20 @@ const DanceMirrorAPI = (function() {
             }
         },
 
-        // ✅ 新增：后端搜索接口
-        searchVideos: async function(query) {
-            return await request(`/videos/search?q=${encodeURIComponent(query)}`, { method: 'GET' });
+        // 后端搜索接口
+        searchVideos: async function(query, opts = {}) {
+            const page = opts.page || 1;
+            const size = opts.size || 20;
+            const sort = opts.sort || "date_desc";
+            // 拼接查询参数，调用 /api/v1/videos/search
+            return await request(`/videos/search?q=${encodeURIComponent(query)}&page=${page}&size=${size}&sort=${sort}`, { method: "GET" });
         },
 
         // 删除视频
         deleteVideo: async function(id) {
             return await request(`/videos/${id}`, { method: 'DELETE' });
         },
+        
 
         // 下载文件
         downloadFile: function(path) {

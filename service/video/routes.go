@@ -1,7 +1,6 @@
 package video
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,8 +12,8 @@ import (
 	"github.com/Albert-tru/DanceMirror/config"
 	"github.com/Albert-tru/DanceMirror/service/auth"
 	"github.com/Albert-tru/DanceMirror/service/cache"
-	"github.com/Albert-tru/DanceMirror/service/storage"
 	"github.com/Albert-tru/DanceMirror/service/search"
+	"github.com/Albert-tru/DanceMirror/service/storage"
 	"github.com/Albert-tru/DanceMirror/types"
 	"github.com/Albert-tru/DanceMirror/utils"
 	"github.com/gorilla/mux"
@@ -47,7 +46,9 @@ func (h *Handler) RegisterRoutes(router *mux.Router) {
 	router.HandleFunc("/videos/stream/{key:.*}", h.handleProxyVideo).Methods(http.MethodGet)
 
 	// 基础视频路由
+	router.HandleFunc("/videos/search", auth.WithJWTAuth(h.Search, h.userStore)).Methods(http.MethodGet)
 	router.HandleFunc("/videos", auth.WithJWTAuth(h.handleGetVideos, h.userStore)).Methods(http.MethodGet)
+	router.HandleFunc("/videos/search", auth.WithJWTAuth(h.Search, h.userStore)).Methods(http.MethodGet)
 	router.HandleFunc("/videos", auth.WithJWTAuth(h.handleUpload, h.userStore)).Methods(http.MethodPost)
 	router.HandleFunc("/videos/{id}", auth.WithJWTAuth(h.handleGetVideo, h.userStore)).Methods(http.MethodGet)
 	router.HandleFunc("/videos/{id}", auth.WithJWTAuth(h.handleDeleteVideo, h.userStore)).Methods(http.MethodDelete)
@@ -71,7 +72,7 @@ func (h *Handler) handleProxyVideo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 从 MinIO 获取对象
-	ctx := context.Background()
+	ctx := r.Context()
 	obj, err := h.getMiniOClient().GetObject(ctx, config.Envs.MinIOBucket, key, minio.GetObjectOptions{})
 	if err != nil {
 		utils.WriteError(w, http.StatusNotFound, fmt.Errorf("file not found"))
@@ -168,7 +169,7 @@ func (h *Handler) handleDispatchCropTask(w http.ResponseWriter, r *http.Request)
 
 	// 7. 更新 DB 状态
 	video.Status = "queued"
-	h.store.UpdateVideo(video)
+	h.store.UpdateVideo(r.Context(), video)
 
 	utils.WriteJSON(w, http.StatusOK, map[string]string{
 		"message": "Task queued successfully",
@@ -187,7 +188,7 @@ func (h *Handler) fileURL(key string) string {
 
 func (h *Handler) handleGetVideos(w http.ResponseWriter, r *http.Request) {
 	userID := auth.GetUserIDFromContext(r.Context())
-	videos, err := h.store.GetVideos(userID)
+	videos, err := h.store.GetVideos(r.Context(), userID)
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, err)
 		return
@@ -239,7 +240,7 @@ func (h *Handler) handleUpload(w http.ResponseWriter, r *http.Request) {
 	objectKey := fmt.Sprintf("videos/%d/%d_%s", userID, time.Now().UnixNano(), header.Filename)
 
 	// 上传到 MinIO
-	if err := h.storage.Upload(context.Background(), objectKey, file, header.Size, header.Header.Get("Content-Type")); err != nil {
+	if err := h.storage.Upload(r.Context(), objectKey, file, header.Size, header.Header.Get("Content-Type")); err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, err)
 		return
 	}
@@ -255,7 +256,7 @@ func (h *Handler) handleUpload(w http.ResponseWriter, r *http.Request) {
 		Status:      "pending", // 初始状态
 	}
 
-	if err := h.store.CreateVideo(video); err != nil {
+	if err := h.store.CreateVideo(r.Context(), video); err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, err)
 		return
 	}
@@ -274,9 +275,9 @@ func (h *Handler) handleDeleteVideo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if video.ObjectKey != "" {
-		h.storage.Delete(context.Background(), video.ObjectKey)
+		h.storage.Delete(r.Context(), video.ObjectKey)
 	}
-	h.store.DeleteVideo(id)
+	h.store.DeleteVideo(r.Context(), id)
 	h.cache.ClearUserVideosCache(r.Context(), video.UserID)
 	h.cache.ClearVideoCache(r.Context(), id)
 
@@ -285,7 +286,7 @@ func (h *Handler) handleDeleteVideo(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) checkVideoOwnership(w http.ResponseWriter, r *http.Request, videoID int) (*types.Video, error) {
 	userID := auth.GetUserIDFromContext(r.Context())
-	video, err := h.store.GetVideoByID(videoID)
+	video, err := h.store.GetVideoByID(r.Context(), videoID)
 	if err != nil {
 		return nil, fmt.Errorf("video not found")
 	}
@@ -295,7 +296,7 @@ func (h *Handler) checkVideoOwnership(w http.ResponseWriter, r *http.Request, vi
 	return video, nil
 }
 
-func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) SearchOld(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query().Get("q")
 	if query == "" {
 		h.handleGetVideos(w, r) // 如果没有关键词，回退到普通列表
@@ -303,7 +304,7 @@ func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 调用 ES 搜索拿到 ID 列表
-	ids, err := h.esClient.SearchVideos(query, 1, 20)
+	ids, err := h.esClient.SearchVideos(r.Context(), query, 1, 20)
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, err)
 		return
@@ -311,7 +312,45 @@ func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {
 
 	// 根据 ID 回 MySQL 查完整数据 (或者直接从 ES 返回部分字段)
 	// 这里简单演示回表查，保证数据最新
-	videos, err := h.store.GetVideosByIDs(ids)
+	videos, err := h.store.GetVideosByIDs(r.Context(), ids)
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, err)
+		return
+	}
 
 	utils.WriteJSON(w, http.StatusOK, videos)
+}
+
+func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query().Get("q")
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page < 1 {
+		page = 1
+	}
+	size, _ := strconv.Atoi(r.URL.Query().Get("size"))
+	if size < 1 {
+		size = 20
+	}
+	sort := r.URL.Query().Get("sort")
+
+	videos, total, err := h.store.SearchVideos(r.Context(), query, page, size, sort)
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	for i := range videos {
+		key := videos[i].StoragePath
+		if key == "" {
+			key = videos[i].ObjectKey
+		}
+		videos[i].FilePath = h.fileURL(key)
+	}
+
+	utils.WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"items": videos,
+		"total": total,
+		"page":  page,
+		"size":  size,
+	})
 }
