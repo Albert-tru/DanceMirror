@@ -10,6 +10,149 @@
     <link rel="stylesheet" href="/static/css/common.css">
     <link rel="stylesheet" href="/static/css/video-player.css">
     <style>
+        /* AI 评分面板 */
+        .ai-score-board {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            padding: 10px 20px;
+            border-radius: 30px;
+            color: white;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            border: 2px solid #667eea;
+            backdrop-filter: blur(5px);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .ai-score-board.active { opacity: 1; }
+        
+        .score-circle {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: 4px solid #10b981;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: bold;
+        }
+        
+        .score-text {
+            display: flex;
+            flex-direction: column;
+        }
+        .score-label { font-size: 12px; color: #ccc; }
+        .score-comment { font-size: 16px; font-weight: bold; color: #10b981; }
+
+        /* 骨架 Canvas 覆盖层 */
+    .skeleton-canvas {
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        pointer-events: none !important;
+        z-index: 999 !important; /* ✅ 提高到最高层 */
+        display: block !important;
+        background: transparent !important;
+    }
+
+        /* 确保视频容器是相对定位 */
+    .video-wrapper {
+        position: relative !important;
+    }
+
+            /* ===== AI 开关样式 ===== */
+    .switch-label {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .switch {
+        z-index: 1000;
+        position: relative;
+        display: inline-block;
+        width: 44px;
+        height: 24px;
+    }
+
+    .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        transition: 0.3s;
+        border-radius: 24px;
+    }
+
+    .slider:before {
+        position: absolute;
+        content: "";
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: 0.3s;
+        border-radius: 50%;
+    }
+
+    input:checked + .slider {
+        background-color: var(--success);
+    }
+
+    input:checked + .slider:before {
+        transform: translateX(20px);
+    }
+
+    /* 加载状态 */
+    input:disabled + .slider {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    /* ===== AI 状态提示 ===== */
+    .ai-status-hint {
+        font-size: 11px;
+        color: var(--text-tertiary);
+        margin-top: 4px;
+        min-height: 16px;
+        transition: color 0.3s;
+    }
+
+    .ai-status-hint.loading {
+        color: var(--info);
+        animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    .ai-status-hint.ready {
+        color: var(--success);
+    }
+
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+    </style>
+    <style>
         /* ===== 颜色系统 ===== */
         :root {
             --primary: #667eea;
@@ -495,6 +638,7 @@
             position: sticky;
             top: 80px;
             scroll-behavior: smooth;
+            padding-bottom: 20px; 
         }
 
         /* ===== 云端视频选择弹窗 ===== */
@@ -725,7 +869,8 @@
         }
 
         .advanced-controls-content.show {
-            max-height: 500px;
+            max-height: 60vh; /* 调整高度限制，适应屏幕 */
+            overflow-y: auto; /* ✅ 核心修复：添加滚动条，防止内容被截掉 */
         }
 
         .control-section {
@@ -815,8 +960,8 @@
 
         .speed-buttons {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 6px;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 4px;
         }
 
         .btn-group {
@@ -1028,6 +1173,8 @@
         .speed-buttons .btn {
             background: var(--bg-primary);
             color: var(--text-secondary);
+            padding: 4px 6px;  /* ✅ 缩小按钮内边距 */
+            font-size: 11px;   /* ✅ 缩小字体 */
         }
 
         .speed-buttons .btn.active {
@@ -1079,6 +1226,7 @@
             border-color: var(--primary);
         }
     </style>
+
 </head>
 
 <body>
@@ -1126,7 +1274,10 @@
                 <div id="singleVideoContainer" class="video-workspace single-mode-workspace">
                     <div class="video-player-wrapper">
                         <div class="video-label teaching-label">📚 教学视频</div>
-                        <video id="singleVideo" controls crossorigin="anonymous"></video>
+                        <div style="position: relative; width: 100%; height: 100%;">
+                            <video id="singleVideo" controls crossorigin="anonymous" style="width: 100%; display: block;"></video>
+                            <canvas id="singleSkeletonCanvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10;"></canvas>
+                        </div>
                         <div class="video-empty-state" id="singleVideoEmpty">
                             <svg width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                 stroke-width="1.5">
@@ -1149,6 +1300,15 @@
 
                 <!-- 对照模式容器 -->
                 <div id="comparisonContainer" class="video-workspace comparison-workspace">
+    <!-- ✅ AI Scoreboard -->
+    <div id="aiScoreBoard" class="ai-score-board">
+        <div class="score-circle" id="liveScore">0</div>
+        <div class="score-text">
+            <span class="score-label">实时匹配度</span>
+            <span class="score-comment" id="scoreComment">准备中...</span>
+        </div>
+    </div>
+
                     <!-- ✅ 新增：布局切换按钮 -->
                     <div class="layout-switcher">
                         <button class="btn btn-sm btn-layout active" data-layout="horizontal">↔️ 左右对照</button>
@@ -1159,6 +1319,7 @@
                         <div class="video-player-wrapper teaching-video">
                             <div class="video-label teaching-label">📚 教学视频</div>
                             <video id="originalVideo" controls crossorigin="anonymous"></video>
+                            <canvas id="teachSkeletonCanvas" class="skeleton-canvas"></canvas>
                             <div class="video-empty-state" id="originalVideoEmpty">
                                 <svg width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                     stroke-width="1.5">
@@ -1174,6 +1335,7 @@
                         <div class="video-player-wrapper user-video">
                             <div class="video-label user-label">🎥 我的视频</div>
                             <video id="userVideo" controls muted></video>
+                            <canvas id="userSkeletonCanvas" class="skeleton-canvas"></canvas>
                             <div class="video-empty-state" id="userVideoEmpty">
                                 <svg width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                     stroke-width="1.5">
@@ -1194,7 +1356,7 @@
                             <button class="btn btn-control" id="masterLoopToggle">🔄</button>
                             <div class="sync-offset-control">
                                 <label>同步偏移:</label>
-                                <input id="offsetRange" type="range" min="-5" max="5" step="0.1" value="0" />
+                                <input id="offsetRange" type="range" min="-15" max="15" step="0.1" value="0" />
                                 <span id="offsetLabel">0.0s</span>
                             </div>
                         </div>
@@ -1212,23 +1374,41 @@
                     <div class="advanced-controls-content" id="advancedContent">
                         <!-- 播放速度 -->
                         <div class="control-section">
-                            <h4>⏱️ 播放速度 <span class="current-value" id="currentSpeed">1.0x</span></h4>
-                            <div class="speed-buttons">
+                            <h4>⏱️ 教学视频速度 <span class="current-value" id="currentTeachSpeed">1.0x</span></h4>
+                            <div class="speed-buttons" id="teachSpeedButtons">
+                                <button class="btn btn-sm" data-speed="0.5">0.5x</button>
                                 <button class="btn btn-sm" data-speed="0.6">0.6x</button>
                                 <button class="btn btn-sm" data-speed="0.7">0.7x</button>
                                 <button class="btn btn-sm" data-speed="0.8">0.8x</button>
                                 <button class="btn btn-sm" data-speed="0.9">0.9x</button>
                                 <button class="btn btn-sm active" data-speed="1.0">1.0x</button>
-                                <button class="btn btn-sm" data-speed="1.1">1.1x</button>
                                 <button class="btn btn-sm" data-speed="1.2">1.2x</button>
+                                <button class="btn btn-sm" data-speed="1.5">1.5x</button>
+                            </div>
+                        </div>
+
+                        <div class="control-section">
+                            <h4>⏱️ 我的视频速度 <span class="current-value" id="currentUserSpeed">1.0x</span></h4>
+                            <div class="speed-buttons" id="userSpeedButtons">
+                                <button class="btn btn-sm" data-speed="0.5">0.5x</button>
+                                <button class="btn btn-sm" data-speed="0.6">0.6x</button>
+                                <button class="btn btn-sm" data-speed="0.7">0.7x</button>
+                                <button class="btn btn-sm" data-speed="0.8">0.8x</button>
+                                <button class="btn btn-sm" data-speed="0.9">0.9x</button>
+                                <button class="btn btn-sm active" data-speed="1.0">1.0x</button>
+                                <button class="btn btn-sm" data-speed="1.2">1.2x</button>
+                                <button class="btn btn-sm" data-speed="1.5">1.5x</button>
                             </div>
                         </div>
 
                         <!-- 镜面翻转 -->
                         <div class="control-section">
                             <h4>🪞 镜面翻转</h4>
-                            <button class="btn btn-block" id="mirrorOriginal">翻转教学视频</button>
-                            <button class="btn btn-block" id="mirrorUser">翻转我的视频</button>
+                            <!-- 使用 btn-group 让按钮并排显示 -->
+                            <div class="btn-group">
+                                <button class="btn" id="mirrorOriginal">翻转教学视频</button>
+                                <button class="btn" id="mirrorUser">翻转我的视频</button>
+                            </div>
                         </div>
 
                         <!-- AB循环 -->
@@ -1242,6 +1422,24 @@
                                 <button class="btn btn-sm" id="clearLoop">清除</button>
                             </div>
                         </div>
+
+                        <!-- AI 辅助 -->
+                        <div class="section-toggle active">
+                        <span>🤖 AI 辅助</span>
+                        </div>
+                        <div style="padding: 12px;">
+                            <label class="switch-label">
+                                <span>开启骨架识别</span>
+                                <label class="switch">
+                                    <input type="checkbox" id="aiToggle">
+                                    <span class="slider round"></span>
+                                </label>
+                            </label>
+                            <p style="font-size:12px; color:#888; margin-top:5px;">
+                                在摄像头画面上绘制骨骼节点
+                            </p>
+                            <p class="ai-status-hint" id="aiStatusHint">点击开关启动 AI 引擎</p>
+                        </div>    
                     </div>
                 </div>
                 <!-- 快速操作卡片 -->
@@ -1381,9 +1579,7 @@
             <button id="cancelCropBtn" type="button" class="btn">取消</button>
         </div>
     </div>
-
-    <script src="/static/js/utils.js"></script>
-    <script src="/static/js/api.js"></script>
+     
     <script>
         // elements
         const originalVideo = document.getElementById('originalVideo');
@@ -1544,6 +1740,12 @@
                 if (isSingleMode) return;
                 syncUserVideoTime();
             });
+             // ✅ 核心修复：持续同步用户视频进度
+            originalVideo.addEventListener('timeupdate', () => {
+                if (isSingleMode) return; // 单视频模式下不需要同步
+                if (abLoopActive) return; // AB 循环模式下由循环逻辑接管
+                syncUserVideoTime();
+            });           
             // 注意：timeupdate 事件在切换模式时需要特殊处理，见 initModeSwitcher
         }
 
@@ -1644,10 +1846,23 @@
 
         function syncUserVideoTime() {
             if (!userVideo.src || userVideo.readyState < 2) return;
-            const target = originalVideo.currentTime + syncOffset;
-            const clamped = Math.max(0, Math.min(userVideo.duration || Infinity, target));
+            
+            // ✅ 修复逻辑：
+            // syncOffset = +15 → 用户视频从第 15 秒开始（跳过开头）
+            // syncOffset = -15 → 用户视频比教学视频提前 15 秒
+            const teachTime = originalVideo.currentTime;  // 教学视频当前时间
+            const userTargetTime = teachTime + syncOffset; // 用户视频应该在的时间点
+            
+            // 边界限制：不能小于 0，不能超过视频总时长
+            const clamped = Math.max(0, Math.min(userVideo.duration || Infinity, userTargetTime));
+            
+            // 只有当差异超过 0.2 秒时才调整（避免频繁微调导致卡顿）
             if (Math.abs(userVideo.currentTime - clamped) > 0.2) {
-                try { userVideo.currentTime = clamped; } catch (e) { console.log('sync err', e); }
+                try { 
+                    userVideo.currentTime = clamped; 
+                } catch (e) { 
+                    console.log('sync err', e); 
+                }
             }
         }
 
@@ -1905,6 +2120,7 @@
             min-height: unset !important;
             max-height: unset !important;
             width: 100%;
+            position: relative !important;
         `;
                 }
             }, { once: true });
@@ -1918,6 +2134,7 @@
             min-height: unset !important;
             max-height: unset !important;
             width: 100%;
+            position: relative !important;
         `;
                 }
             }, { once: true });
@@ -2069,6 +2286,7 @@
             min-height: unset !important;
             max-height: unset !important;
             width: 100%;
+            position: relative !important;
         `;
 
                         console.log(`✅ 右侧容器已调整:
@@ -2224,22 +2442,32 @@
 
         // ---------- misc controls ----------
         function initMiscControls() {
-            // 播放速度控制
-            document.querySelectorAll('.speed-buttons .btn').forEach(b => b.addEventListener('click', (e) => {
+            // ✅ 修改：教学视频速度控制
+            document.querySelectorAll('#teachSpeedButtons .btn').forEach(b => b.addEventListener('click', (e) => {
                 const s = parseFloat(b.dataset.speed || 1.0);
 
-                // ✅ 智能判断：控制当前模式下的视频
+                // 智能判断：控制当前模式下的教学视频
                 const activeVideo = isSingleMode ? singleVideo : originalVideo;
                 if (activeVideo) activeVideo.playbackRate = s;
 
-                // 在对照模式下，同时控制 userVideo
-                if (!isSingleMode && userVideo) userVideo.playbackRate = s;
-
-                document.querySelectorAll('.speed-buttons .btn').forEach(x => x.classList.remove('active'));
+                document.querySelectorAll('#teachSpeedButtons .btn').forEach(x => x.classList.remove('active'));
                 b.classList.add('active');
-                const speedIndicator = document.getElementById('currentSpeed');
+                const speedIndicator = document.getElementById('currentTeachSpeed');
                 if (speedIndicator) speedIndicator.textContent = s + 'x';
-                showMessage('播放速度: ' + s + 'x', 'success', 1200);
+                showMessage('教学视频速度: ' + s + 'x', 'success', 1200);
+            }));
+
+            // ✅ 新增：用户视频速度控制
+            document.querySelectorAll('#userSpeedButtons .btn').forEach(b => b.addEventListener('click', (e) => {
+                const s = parseFloat(b.dataset.speed || 1.0);
+
+                if (userVideo) userVideo.playbackRate = s;
+
+                document.querySelectorAll('#userSpeedButtons .btn').forEach(x => x.classList.remove('active'));
+                b.classList.add('active');
+                const speedIndicator = document.getElementById('currentUserSpeed');
+                if (speedIndicator) speedIndicator.textContent = s + 'x';
+                showMessage('我的视频速度: ' + s + 'x', 'success', 1200);
             }));
 
             // 镜面翻转控制
@@ -2252,7 +2480,6 @@
             document.getElementById('startLoop').addEventListener('click', startABLoop);
             document.getElementById('clearLoop').addEventListener('click', clearABLoop);
         }
-
 
 
         function toggleMirror(target) {
@@ -2369,39 +2596,87 @@
                 this._onMouseUp = this.onMouseUp.bind(this);
             }
 
-            init() {
-                // ✅ 等待视频元数据加载完成
-                if (this.video.readyState >= 1) {
-                    this.resizeCanvas();
-                } else {
-                    this.video.addEventListener('loadedmetadata', () => {
-                        this.resizeCanvas();
-                    }, { once: true });
-                }
-
-                window.addEventListener('resize', () => this.resizeCanvas());
-                this.initRatioButtons();
-
-                // ✅ 绑定鼠标/触摸事件
-                this.canvas.addEventListener('mousedown', this._onMouseDown);
-                window.addEventListener('mousemove', this._onMouseMove);
-                window.addEventListener('mouseup', this._onMouseUp);
-
-                // 简单的触摸支持
-                this.canvas.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    const t = e.touches[0];
-                    this.onMouseDown({ clientX: t.clientX, clientY: t.clientY });
-                }, { passive: false });
-                window.addEventListener('touchmove', (e) => {
-                    if (this.isDragging) e.preventDefault();
-                    const t = e.touches[0];
-                    this.onMouseMove({ clientX: t.clientX, clientY: t.clientY });
-                }, { passive: false });
-                window.addEventListener('touchend', () => this.onMouseUp());
-
-                this.drawLoop();
-            }
+async init() {
+    if(this.isInitialized) {
+        console.log("✅ AI 已初始化，跳过重复加载");
+        return;
+    }
+    
+    if(!window.Pose) { 
+        throw new Error("MediaPipe 库未加载");
+    }
+    
+    const hint = document.getElementById('aiStatusHint');
+    if(hint) {
+        hint.textContent = "⏳ 正在加载 AI 模型...";
+        hint.className = "ai-status-hint loading";
+    }
+    
+    let teachResultCount = 0;
+    let userResultCount = 0;
+    
+    // 初始化教学视频的 Pose
+    this.teachPose = new window.Pose({
+        locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`
+    });
+    
+    this.teachPose.setOptions({
+        modelComplexity: 1,
+        smoothLandmarks: true,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+    });
+    
+    // ✅ 添加详细的回调日志
+    this.teachPose.onResults(r => {
+        teachResultCount++;
+        
+        if(teachResultCount === 1) {
+            console.log("🎉 首次收到教学视频 Pose 结果:", {
+                poseLandmarks: r.poseLandmarks ? `${r.poseLandmarks.length} 个点` : "无",
+                image: r.image ? `${r.image.width}x${r.image.height}` : "无"
+            });
+        }
+        
+        if(teachResultCount % 30 === 0) {
+            console.log(`📊 教学视频 Pose 结果 #${teachResultCount}:`, 
+                r.poseLandmarks ? "✅ 有数据" : "❌ 无数据"
+            );
+        }
+        
+        const canvasId = document.body.classList.contains('mode-single') 
+            ? 'singleSkeletonCanvas' 
+            : 'teachSkeletonCanvas';
+        this.draw(r, canvasId);
+    });
+    
+    // 初始化用户视频的 Pose
+    this.userPose = new window.Pose({
+        locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`
+    });
+    
+    this.userPose.setOptions({
+        modelComplexity: 1,
+        smoothLandmarks: true,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+    });
+    
+    this.userPose.onResults(r => { 
+        userResultCount++;
+        
+        if(userResultCount === 1) {
+            console.log("🎉 首次收到用户视频 Pose 结果");
+        }
+        
+        if(!document.body.classList.contains('mode-single')) {
+            this.draw(r, 'userSkeletonCanvas'); 
+        }
+    });
+    
+    this.isInitialized = true;
+    console.log("✅ AI 初始化完成，等待 onResults 回调...");
+}
 
             resizeCanvas() {
                 const videoWidth = this.video.videoWidth || 1280;
@@ -2930,6 +3205,7 @@
                                 min-height: unset !important;
                                 max-height: unset !important;
                                 width: 100%;
+                                position: relative !important;
                             `;
 
                             console.log(`✅ 右侧容器已强制调整为 ${userVideo.videoWidth}x${userVideo.videoHeight}`);
@@ -2955,8 +3231,228 @@
                 }
             });
         })();
-
     </script>
-</body>
 
+    <!-- 基础工具库 -->
+    <script src="/static/js/utils.js"></script>
+    <script src="/static/js/api.js"></script>
+    <!-- ✅ 集成 MoveNet 姿态检测 (替代 MediaPipe Pose，更稳定) -->
+    <!-- 删除原来的 MediaPipe 库，换成这些 -->
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
+
+// ...existing code...
+<script>
+(function() {
+    console.log("🚀 正在加载 MoveNet (更稳定的 AI 模型)...");
+
+    // COCO 关键点连接图 (标准骨架)
+    const CONNECTIONS = [
+        [0, 1], [0, 2], [1, 3], [2, 4], // 脸部
+        [5, 6], [5, 7], [7, 9], [6, 8], [8, 10], // 上肢
+        [5, 11], [6, 12], [11, 12], // 躯干
+        [11, 13], [13, 15], [12, 14], [14, 16] // 下肢
+    ];
+
+    window.AIContext = {
+        isEnabled: false,
+        detector: null,
+        isInitialized: false,
+
+        async init() {
+            if (this.isInitialized) return;
+
+            const hint = document.getElementById('aiStatusHint');
+            if(hint) {
+                hint.textContent = "⏳ 加载 MoveNet 模型中...";
+                hint.className = "ai-status-hint loading";
+            }
+
+            try {
+                // 等待 TFJS 加载
+                await window.tf.ready();
+                console.log("✅ TFJS Backend:", window.tf.getBackend());
+
+                // 创建检测器 (使用 Thunder 模型，精度高且快)
+                const model = window.poseDetection.SupportedModels.MoveNet;
+                const detectorConfig = {
+                    modelType: window.poseDetection.movenet.modelType.SINGLEPOSE_THUNDER
+                };
+                this.detector = await window.poseDetection.createDetector(model, detectorConfig);
+
+                this.isInitialized = true;
+                console.log("✅ MoveNet 模型加载完成！");
+            } catch (e) {
+                console.error("MoveNet 加载失败:", e);
+                throw e;
+            }
+        },
+
+        async start() {
+            console.log("🚀 启动检测...");
+            const toggle = document.getElementById('aiToggle');
+            const hint = document.getElementById('aiStatusHint');
+            
+            if(toggle) toggle.disabled = true;
+
+            try {
+                await this.init();
+                this.isEnabled = true;
+                this.loop();
+                
+                // 播放视频
+                const v = document.getElementById('singleVideo') || document.getElementById('originalVideo');
+                if(v && v.paused) {
+                    v.play().catch(e => console.log("自动播放被拦截"));
+                }
+
+                if(hint) {
+                    hint.textContent = "✅ AI 运行中";
+                    hint.className = "ai-status-hint ready";
+                }
+            } catch (e) {
+                alert("启动失败: " + e.message);
+                if(toggle) toggle.checked = false;
+            } finally {
+                if(toggle) toggle.disabled = false;
+            }
+        },
+
+        stop() {
+            this.isEnabled = false;
+            // 清空画布
+            ['singleSkeletonCanvas','teachSkeletonCanvas','userSkeletonCanvas'].forEach(id => {
+                const c = document.getElementById(id);
+                if(c) c.getContext('2d').clearRect(0,0,c.width,c.height);
+            });
+            const hint = document.getElementById('aiStatusHint');
+            if(hint) hint.textContent = "已关闭";
+        },
+
+        async loop() {
+            if (!this.isEnabled) return;
+
+            const isSingle = document.body.classList.contains('mode-single');
+            const videos = [
+                { vid: isSingle ? 'singleVideo' : 'originalVideo', cid: isSingle ? 'singleSkeletonCanvas' : 'teachSkeletonCanvas' },
+                { vid: 'userVideo', cid: 'userSkeletonCanvas' }
+            ];
+
+            for (const item of videos) {
+                // 如果是单人模式，跳过用户视频处理
+                if (isSingle && item.vid === 'userVideo') continue;
+
+                const video = document.getElementById(item.vid);
+                const canvas = document.getElementById(item.cid);
+
+                if (video && canvas && !video.paused && video.readyState >= 2) {
+                    // 1. 调整尺寸
+                    if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+                        canvas.width = video.videoWidth || video.offsetWidth;
+                        canvas.height = video.videoHeight || video.offsetHeight;
+                    }
+
+                    try {
+                        // 2. 检测姿态
+                        const poses = await this.detector.estimatePoses(video);
+                        
+                        // 3. 绘制
+                        const ctx = canvas.getContext('2d');
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        
+                        if (poses.length > 0) {
+                            this.drawSkeleton(ctx, poses[0].keypoints);
+                        }
+                    } catch (e) {
+                        console.warn("检测帧失败:", e);
+                    }
+                }
+            }
+
+            requestAnimationFrame(() => this.loop());
+        },
+
+        drawSkeleton(ctx, keypoints) {
+            const minConfidence = 0.3;
+
+            // 绘制线条
+            ctx.strokeStyle = '#00FF00';
+            ctx.lineWidth = 3;
+            CONNECTIONS.forEach(([i, j]) => {
+                const kp1 = keypoints[i];
+                const kp2 = keypoints[j];
+                if (kp1.score > minConfidence && kp2.score > minConfidence) {
+                    ctx.beginPath();
+                    ctx.moveTo(kp1.x, kp1.y);
+                    ctx.lineTo(kp2.x, kp2.y);
+                    ctx.stroke();
+                }
+            });
+
+            // 绘制关键点
+            keypoints.forEach(kp => {
+                if (kp.score > minConfidence) {
+                    ctx.fillStyle = '#FF0000';
+                    ctx.beginPath();
+                    ctx.arc(kp.x, kp.y, 5, 0, 2 * Math.PI);
+                    ctx.fill();
+                }
+            });
+        }
+    };
+
+    // 绑定开关 (修复版：使用 onclick 而不是 addEventListener，防止重复或失效)
+    function initAIToggle() {
+        const toggle = document.getElementById('aiToggle');
+        const hint = document.getElementById('aiStatusHint');
+        
+        if (!toggle) {
+            console.error("❌ 找不到 ID 为 'aiToggle' 的元素！请检查 HTML。");
+            return;
+        }
+
+        console.log("✅ 成功找到 AI 开关按钮");
+
+        // 强制重置状态
+        toggle.checked = false;
+        toggle.disabled = false;
+        if(hint) hint.textContent = "骨架识别 (MoveNet)";
+
+        // 直接覆盖 onclick 事件，确保一定会触发
+        toggle.onclick = async function(e) {
+            // 注意：onclick 触发时 checked 状态已经改变了
+            const isChecked = e.target.checked;
+            console.log("🖱️ 点击开关 ->", isChecked);
+
+            if (isChecked) {
+                // 开启
+                if (window.AIContext) {
+                    await window.AIContext.start();
+                } else {
+                    console.error("❌ AIContext 未定义");
+                    alert("AI 核心未加载，请刷新页面重试");
+                    e.target.checked = false;
+                }
+            } else {
+                // 关闭
+                if (window.AIContext) {
+                    window.AIContext.stop();
+                }
+            }
+        };
+    }
+    
+    // 确保 DOM 加载完毕后执行
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        setTimeout(initAIToggle, 500); // 稍微延迟一点点，确保万无一失
+    } else {
+        document.addEventListener('DOMContentLoaded', () => setTimeout(initAIToggle, 500));
+    }
+
+})();
+</script>
+</script>
+</body>
 </html>
