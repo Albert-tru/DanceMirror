@@ -131,3 +131,29 @@ func (r *RedisClient) ClearVideoCache(ctx context.Context, videoID int) error {
 	key := fmt.Sprintf("video:%d", videoID)
 	return r.Delete(ctx, key)
 }
+
+// IncrementView 增加视频浏览量 (Redis 原子操作)
+func (r *RedisClient) IncrementView(ctx context.Context, videoID int) error {
+	key := fmt.Sprintf("video:%d:views", videoID)
+	return r.client.Incr(ctx, key).Err() // 原子自增
+}
+
+// GetViewCount 获取视频浏览量
+func (r *RedisClient) GetViewCount(ctx context.Context, videoID int) (int, error) {
+	key := fmt.Sprintf("video:%d:views", videoID)
+	countStr, err := r.client.Get(ctx, key).Result()
+	if err == redis.Nil {
+		return 0, nil // 未命中，返回0
+	}
+	if err != nil {
+		return 0, err
+	}
+	var count int
+	_, err = fmt.Sscanf(countStr, "%d", &count)
+	return count, err
+}
+
+// GetClient 暴露底层的 Client 给高级操作使用 (如 Scan)
+func (r *RedisClient) GetClient() *redis.Client {
+	return r.client
+}
