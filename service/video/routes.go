@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/url"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Albert-tru/DanceMirror/config"
@@ -24,23 +24,33 @@ import (
 )
 
 type Handler struct {
-	store       types.VideoStore
-	userStore   types.UserStore
-	cache       *cache.RedisClient
-	storage     storage.VideoStorage
-	publishCrop func(task map[string]interface{}) error
-	esClient    *search.ESClient
-	sf          singleflight.Group
+	store          types.VideoStore
+	userStore      types.UserStore
+	cache          *cache.RedisClient
+	storage        storage.VideoStorage
+	publishCrop    func(task map[string]interface{}) error
+	publishAnalyze func(task map[string]interface{}) error
+	esClient       *search.ESClient
+	sf             singleflight.Group
 }
 
-func NewHandler(store types.VideoStore, userStore types.UserStore, cache *cache.RedisClient, storage storage.VideoStorage, publishCrop func(task map[string]interface{}) error, esClient *search.ESClient) *Handler {
+func NewHandler(
+	store types.VideoStore,
+	userStore types.UserStore,
+	cache *cache.RedisClient,
+	storage storage.VideoStorage,
+	publishCrop func(task map[string]interface{}) error,
+	publishAnalyze func(task map[string]interface{}) error,
+	esClient *search.ESClient,
+) *Handler {
 	return &Handler{
-		store:       store,
-		userStore:   userStore,
-		cache:       cache,
-		storage:     storage,
-		publishCrop: publishCrop,
-		esClient:    esClient,
+		store:          store,
+		userStore:      userStore,
+		cache:          cache,
+		storage:        storage,
+		publishCrop:    publishCrop,
+		publishAnalyze: publishAnalyze,
+		esClient:       esClient,
 	}
 }
 
@@ -54,6 +64,8 @@ func (h *Handler) RegisterRoutes(router *mux.Router) {
 	router.HandleFunc("/videos/{id}", auth.WithJWTAuth(h.handleGetVideo, h.userStore)).Methods(http.MethodGet)
 	router.HandleFunc("/videos/{id}", auth.WithJWTAuth(h.handleDeleteVideo, h.userStore)).Methods(http.MethodDelete)
 	router.HandleFunc("/videos/{id}/crop", auth.WithJWTAuth(h.handleDispatchCropTask, h.userStore)).Methods(http.MethodPost)
+	router.HandleFunc("/videos/{id}/analyze", auth.WithJWTAuth(h.handleDispatchAnalyze, h.userStore)).Methods(http.MethodPost) // 视频分析任务路由
+	router.HandleFunc("/videos/{id}/analysis", auth.WithJWTAuth(h.handleGetAnalysis, h.userStore)).Methods(http.MethodGet)     // 获取分析结果路由
 
 	// 静态文件服务
 	if config.Envs.StorageDriver != "minio" {
@@ -139,27 +151,23 @@ func (h *Handler) handleDispatchCropTask(w http.ResponseWriter, r *http.Request)
 	})
 }
 
-// 修改：fileURL 改为生成预签名链接 (MinIO Presigned URL)
 func (h *Handler) fileURL(ctx context.Context, key string) string {
 	if key == "" {
 		return ""
 	}
-	// 设置链接过期时间（例如 24 小时）
-	expiry := time.Hour * 24
 
-	// 设置请求参数（可选：例如强制下载或设置 Content-Type）
-	reqParams := make(url.Values)
-	// reqParams.Set("response-content-disposition", "attachment; filename=\"video.mp4\"")
-
-	// 生成预签名 URL
-	// 注意：PresignedGetObject 是离线计算操作，速度极快，不会产生网络 IO
-	presignedURL, err := h.getMiniOClient().PresignedGetObject(ctx, config.Envs.MinIOBucket, key, expiry, reqParams)
-	if err != nil {
-		fmt.Printf("Error generating presigned url for key %s: %v\n", key, err)
-		return ""
+	// ✅ 最稳妥的方案：直接返回公开 URL（不用签名）
+	// 因为你的 minio.go 已经设置了 Bucket 为公开只读模式
+	publicHost := config.Envs.PublicHost
+	if publicHost == "" {
+		publicHost = "localhost"
 	}
 
-	return presignedURL.String()
+	// 格式: http://localhost:9000/bucket/objectKey
+	publicURL := fmt.Sprintf("http://%s:9000/%s/%s", publicHost, config.Envs.MinIOBucket, key)
+
+	fmt.Printf("✅ Generated public URL: %s\n", publicURL)
+	return publicURL
 }
 
 // 修改：使用 cache 包封装好的方法实现 Cache-Aside
@@ -187,16 +195,33 @@ func (h *Handler) handleGetVideos(w http.ResponseWriter, r *http.Request) {
 		}()
 	}
 
-	// 4. 动态生成预签名 URL (这步必须在缓存读取之后每次实时生成)
+	// 4. 动态生成预签名 URL
+	fmt.Printf("🔍 DEBUG: Processing %d videos...\n", len(videos)) // 👈 加这行
 	for i := range videos {
-		key := videos[i].StoragePath
-		if key == "" {
-			key = videos[i].ObjectKey
+		key := getVideoKey(videos[i]) // ✅ 使用辅助函数
+
+		// 👈 加这些日志
+		fmt.Printf("🔍 DEBUG Video[%d] ID=%d | ObjectKey='%s' | StoragePath='%s' | FinalKey='%s'\n",
+			i, videos[i].ID, videos[i].ObjectKey, videos[i].StoragePath, key)
+
+		if key != "" {
+			url := h.fileURL(ctx, key)
+			videos[i].FilePath = url
+			fmt.Printf("   -> Generated URL: %s\n", url) // 👈 看看生成的 URL 对不对
+		} else {
+			fmt.Println("   -> ❌ Key is empty, skipping URL generation")
 		}
-		videos[i].FilePath = h.fileURL(ctx, key)
 	}
 
 	utils.WriteJSON(w, http.StatusOK, videos)
+}
+
+// ✅ 新增：辅助函数，确保任何时候都能拿到 Key
+func getVideoKey(v *types.Video) string {
+	if v.ObjectKey != "" {
+		return v.ObjectKey
+	}
+	return v.StoragePath
 }
 
 // 修改：详情页 Cache-Aside
@@ -216,7 +241,8 @@ func (h *Handler) handleGetVideo(w http.ResponseWriter, r *http.Request) {
 
 		// ✅ Do 方法保证：同一时刻，对同一个 sfKey，fn 函数只会执行一次
 		// 其他并发请求会阻塞在这里等待结果
-		v, err, shared := h.sf.Do(sfKey, func() (interface{}, error) {
+		// 修复：groupcache/singleflight 只返回 v 和 err，不返回 shared
+		v, err := h.sf.Do(sfKey, func() (interface{}, error) {
 			// --- 这里是真正查 DB 的逻辑 (只会有 1 个请求进来) ---
 
 			// a. 查 DB
@@ -237,11 +263,6 @@ func (h *Handler) handleGetVideo(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// 如果是共享结果，说明是从缓存回写中获取的
-		if shared {
-			fmt.Printf("⚡ Singleflight: Video ID %d shared result\n", id)
-		}
-
 		// 类型断言：interface{} -> *types.Video
 		video = v.(*types.Video)
 	}
@@ -253,12 +274,15 @@ func (h *Handler) handleGetVideo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 5. 生成签名 URL (针对每个用户动态生成，不能缓存)
-	key := video.StoragePath
+	// 5. 生成签名 URL
+	key := getVideoKey(video)
 	if key == "" {
-		key = video.ObjectKey
+		key = video.StoragePath
 	}
-	video.FilePath = h.fileURL(ctx, key)
+
+	if key != "" {
+		video.FilePath = h.fileURL(ctx, key)
+	}
 
 	utils.WriteJSON(w, http.StatusOK, video)
 }
@@ -281,7 +305,24 @@ func (h *Handler) handleUpload(w http.ResponseWriter, r *http.Request) {
 
 	// 3. 构建视频元数据对象
 	userID := auth.GetUserIDFromContext(r.Context())
-	uniqueFileName := fmt.Sprintf("%d_%d_%s", userID, time.Now().UnixNano(), header.Filename)
+
+	// a. 获取文件后缀 (如 .mp4)
+	ext := filepath.Ext(header.Filename)
+
+	// b. 获取不带后缀的文件名
+	rawName := strings.TrimSuffix(header.Filename, ext)
+
+	// c. 清理文件名：替换空格和特殊符号，防止 URL 编码问题
+	safeName := strings.Map(func(r rune) rune {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
+			return r
+		}
+		return '_'
+	}, rawName)
+
+	// d. ✅ 核心：格式为 videos/{userID}/{纳秒时间戳}_{随机数}_{清理后的文件名}{后缀}
+	// 纳秒级时间戳几乎不可能冲突，加上原有文件名方便在后台存储桶里肉眼识别
+	uniqueFileName := fmt.Sprintf("videos/%d/%d_%s%s", userID, time.Now().UnixNano(), safeName, ext)
 
 	// 4. 上传到存储 (MinIO/Local)
 	// 注意：这里调用 storage 接口上传，该接口内部应该处理具体的 PutObject 逻辑
@@ -311,6 +352,21 @@ func (h *Handler) handleUpload(w http.ResponseWriter, r *http.Request) {
 		// h.storage.Delete(context.Background(), uniqueFileName)
 		utils.WriteError(w, http.StatusInternalServerError, err)
 		return
+	}
+
+	// 推送 AI 分析任务到 video_analyze_queue
+	if h.publishAnalyze != nil {
+		inputURL := fmt.Sprintf("http://minio:9000/%s/%s", config.Envs.MinIOBucket, video.ObjectKey)
+		task := map[string]interface{}{
+			"video_id":   video.ID,
+			"user_id":    video.UserID,
+			"input_path": inputURL,
+		}
+		if err := h.publishAnalyze(task); err != nil {
+			fmt.Printf("⚠️ enqueue analyze task failed: %v\n", err)
+		} else {
+			fmt.Printf("✅ analyze task enqueued: video_id=%d\n", video.ID)
+		}
 	}
 
 	// 7. ✅ Cache-Aside: 此时 DB 已更新，必须清除该用户的视频列表缓存
@@ -415,11 +471,10 @@ func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for i := range videos {
-		key := videos[i].StoragePath
-		if key == "" {
-			key = videos[i].ObjectKey
+		key := getVideoKey(videos[i]) // ✅ 之前这里用了 &videos[i] 且逻辑不一致，需修正
+		if key != "" {
+			videos[i].FilePath = h.fileURL(r.Context(), key)
 		}
-		videos[i].FilePath = h.fileURL(r.Context(), key)
 	}
 
 	utils.WriteJSON(w, http.StatusOK, map[string]interface{}{
@@ -433,6 +488,94 @@ func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {
 func (s *Store) IncrementVideoViews(ctx context.Context, id int, count int) error {
 	// 原生 SQL 是最高效的
 	query := "UPDATE videos SET views = views + ? WHERE id = ?"
-	_, err := s.db.ExecContext(ctx, query, count, id)
-	return err
+	return s.db.WithContext(ctx).Exec(query, count, id).Error
+}
+
+// 处理视频 AI 分析任务调度
+func (h *Handler) handleDispatchAnalyze(w http.ResponseWriter, r *http.Request) {
+	// 1. 获取 Video ID
+	vars := mux.Vars(r)
+	videoID, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("invalid video id"))
+		return
+	}
+
+	// 2. 验证权限
+	video, err := h.checkVideoOwnership(w, r, videoID)
+	if err != nil {
+		utils.WriteError(w, http.StatusForbidden, err)
+		return
+	}
+
+	// 3. 构造 Python Worker 可访问的路径
+	var inputPath string
+	if config.Envs.StorageDriver == "minio" {
+		// 使用 Docker 内部网络地址 (http://minio:9000/...)
+		inputPath = fmt.Sprintf("http://minio:9000/%s/%s", config.Envs.MinIOBucket, video.ObjectKey)
+	} else {
+		// 本地模式 (仅开发环境)
+		inputPath = filepath.Join(config.Envs.UploadDir, video.ObjectKey)
+	}
+
+	// 4. 构造任务消息
+	// 注意：我们要发送给 MQ 队列，这里复用了 map[string]interface{} 格式
+	// 也可以直接使用 types.AnalyzeTask 结构体序列化
+	task := map[string]interface{}{
+		"video_id":   video.ID,
+		"user_id":    video.UserID,
+		"input_path": inputPath,
+	}
+
+	// 5. 发送任务到 MQ
+	if h.publishAnalyze != nil {
+		if err := h.publishAnalyze(task); err != nil {
+			utils.WriteError(w, http.StatusInternalServerError, fmt.Errorf("failed to queue analysis task"))
+			return
+		}
+	} else {
+		utils.WriteError(w, http.StatusInternalServerError, fmt.Errorf("analysis mq not configured"))
+		return
+	}
+
+	// 6. 返回结果（前端收到后应该显示“AI 分析中...”并开始轮询）
+	utils.WriteJSON(w, http.StatusOK, map[string]string{
+		"message": "AI analysis started",
+		"status":  "analyzing",
+	})
+}
+
+// 获取视频分析结果
+func (h *Handler) handleGetAnalysis(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	videoID, _ := strconv.Atoi(vars["id"])
+
+	// 1. 验证权限 (防止看别人的分析报告)
+	_, err := h.checkVideoOwnership(w, r, videoID)
+	if err != nil {
+		utils.WriteError(w, http.StatusForbidden, err)
+		return
+	}
+
+	// 2. 从 Redis 获取结果
+	// Python Worker 存入的 Key 应该是 "analysis:video:{id}"
+	key := fmt.Sprintf("analysis:video:%d", videoID)
+
+	// 使用 map 接收 JSON 数据
+	var result map[string]interface{}
+	err = h.cache.Get(r.Context(), key, &result)
+
+	// 3. 处理缓存未命中 (还没分析完，或者过期了)
+	if err != nil {
+		// 这里虽然 err != nil，但在业务上代表“处理中”或“无记录”
+		// 我们可以返回一个特定的状态码，或者返回 status: processing
+		utils.WriteJSON(w, http.StatusOK, map[string]string{
+			"status":  "processing",
+			"message": "Analysis is in progress or not found",
+		})
+		return
+	}
+
+	// 4. 返回分析报告
+	utils.WriteJSON(w, http.StatusOK, result)
 }

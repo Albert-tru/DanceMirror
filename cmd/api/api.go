@@ -123,7 +123,7 @@ func (s *APIServer) Run() error {
 	userHandler := user.NewHandler(userStore)
 	userHandler.RegisterRoutes(subrouter)
 
-	// Video Handler with Dependencies
+	// 定义裁剪任务的生产者
 	publishCrop := func(task map[string]interface{}) error {
 		body, err := json.Marshal(task)
 		if err != nil {
@@ -133,7 +133,18 @@ func (s *APIServer) Run() error {
 		return s.mq.Publish("video_crop_queue", body)
 	}
 
-	videoHandler := video.NewHandler(videoStore, userStore, s.redisClient, s.storage, publishCrop, s.es)
+	// 定义ai分析任务的生产者
+	// 这个匿名函数负责把任务塞进 RabbitMQ 的 "video_analyze_queue" 队列
+	publishAnalyze := func(task map[string]interface{}) error {
+		body, err := json.Marshal(task)
+		if err != nil {
+			return err
+		}
+		// 确保这里的队列名和 Python Worker 里监听的 queuedeclare 名字一致
+		return s.mq.Publish("video_analyze_queue", body)
+	}
+
+	videoHandler := video.NewHandler(videoStore, userStore, s.redisClient, s.storage, publishCrop, publishAnalyze, s.es)
 	videoHandler.RegisterRoutes(subrouter)
 
 	// Debug Routes

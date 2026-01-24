@@ -129,6 +129,22 @@ const DanceMirrorAPI = (function() {
                 body: JSON.stringify(params)
             });
         },
+
+        // 触发AI分析 (POST)
+        startAIAnalysis: async (videoId) => {
+            return await request(`/videos/${videoId}/analyze`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json'},
+                body: JSON.stringify({})
+            });
+        },
+
+        // 获取AI分析结果 (GET)
+        getAIAnalysisResult: async (videoId) => {
+            return await request(`/videos/${videoId}/analysis`, {
+                method: 'GET'
+            });
+        },
         
         // 兼容旧名称
         cropVideo: async (videoId, params) => {

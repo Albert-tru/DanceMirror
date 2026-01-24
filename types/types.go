@@ -58,8 +58,8 @@ type Video struct {
 
 	//任务状态
 	Status      string `json:"status" gorm:"column:status;typen:varchar(32);default:'pending'"`
-	StoragePath string `json:"storagePath" gorm:"column:storagePath"`
-	OutputPath  string `json:"outputPath"  gorm:"column:outputPath"` // processing, completed, failed
+	StoragePath string `json:"storage_path" gorm:"column:storagePath"`
+	OutputPath  string `json:"output_path"  gorm:"column:outputPath"` // processing, completed, failed
 }
 
 // UploadVideoPayload 视频上传请求
@@ -121,4 +121,18 @@ type CropParams struct {
 	Y      int `json:"y"`
 	Width  int `json:"width"`
 	Height int `json:"height"`
+}
+
+// ai任务分析结构
+type AnalysisTask struct {
+	VideoID   int    `json:"videoId" gorm:"primaryKey;column:videoId"`
+	UserID    int    `json:"userId" gorm:"column:userId"`
+	InputPath string `json:"inputPath" gorm:"column:inputPath;not null"`
+}
+
+// AI 分析结果结构 (用于 API 返回)
+type AnalysisResult struct {
+	Score       int      `json:"score"`
+	Suggestions []string `json:"suggestions"`
+	Status      string   `json:"status"`
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"time"
 
 	"github.com/minio/minio-go/v7"
@@ -112,11 +113,13 @@ func (m *MinIOStorage) Delete(ctx context.Context, objectKey string) error {
 }
 
 func (m *MinIOStorage) GetPresignedURL(objectKey string, expiry time.Duration) (string, error) {
-	// ✅ 终极方案：直接返回宿主机可访问的公开链接
-	// 这样既避开了 Docker 网络隔离问题，也避开了签名不匹配问题
+	// 直接手动拼接，最稳妥
+	publicHost := os.Getenv("PUBLIC_HOST")
+	if publicHost == "" {
+		publicHost = "localhost" // 给浏览器用的默认值
+	}
 
-	// 格式: http://localhost:9000/<bucket-name>/<object-key>
-	publicURL := fmt.Sprintf("http://localhost:9000/%s/%s", m.bucket, objectKey)
-
+	// ⚠️ 注意：这里硬编码了端口 9000，如果你改了端口这里也要改
+	publicURL := fmt.Sprintf("http://%s:9000/%s/%s", publicHost, m.bucket, objectKey)
 	return publicURL, nil
 }

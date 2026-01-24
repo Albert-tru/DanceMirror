@@ -19,6 +19,7 @@ import (
 )
 
 const QueueName = "video_crop_queue"
+const AnalyzeQueueName = "video_analyze_queue"
 
 func main() {
 	// 初始化观测性工具
@@ -99,9 +100,14 @@ func main() {
 	}
 	defer mqClient.Close()
 
-	// 确保队列存在
+	// 确保裁剪队列存在
 	if err := mqClient.EnsureQueue(QueueName); err != nil {
 		log.Fatal("❌ Failed to declare queue:", err)
+	}
+
+	// 确保分析队列存在
+	if err := mqClient.EnsureQueue(AnalyzeQueueName); err != nil {
+		log.Fatal("❌ Failed to declare analyze queue:", err)
 	}
 
 	// 5. 启动 Worker (并发 5)
