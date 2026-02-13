@@ -1,8 +1,8 @@
 package video
 
 import (
+	"context"
 	"database/sql"
-"context"
 	"encoding/json"
 
 	"github.com/Albert-tru/DanceMirror/service/mq"
@@ -59,7 +59,7 @@ func (s *Store) GetVideoByID(ctx context.Context, id int) (*types.Video, error) 
 	return video, nil
 }
 
-func (s *Store) GetVideos(ctx context.Context, userID int) ([]*types.Video, error) {
+func (s *Store) GetVideos(ctx context.Context, userID int64) ([]*types.Video, error) {
 	var videos []types.Video
 	result := s.db.WithContext(ctx).Where("userId = ?", userID).Order("createdAt DESC").Find(&videos)
 

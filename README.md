@@ -1,3 +1,16 @@
+# DanceMirror - 扒舞学习助手
+
+![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)
+![License](https://img.shields.io/badge/License-MIT-green.svg)
+
+## 📱 项目简介
+
+DanceMirror 是一个专为舞蹈学习者设计的练习辅助工具。通过上传教学视频，你可以：
+
+- 🎬 多速播放（0.25x - 2x）
+- 🪞 镜面翻转
+- 🔁 AB 循环重复练习
+- 📹 录制自己的练习视频
 # 🕺 DanceMirror - 舞蹈镜像学习平台
 
 一个专为舞蹈学习设计的视频分享和练习平台，支持慢速播放、镜面翻转和 AB 循环等功能。
@@ -5,32 +18,63 @@
 ## ✨ 功能特点
 
 ### 🎯 核心功能
-- **用户系统**: 完整的注册/登录功能，JWT 认证
+- **用户系统**: 注册/登录、JWT 认证
 - **视频管理**: 上传、浏览、播放舞蹈视频
-- **增强播放器**: 专为舞蹈学习设计的视频播放器
+- **增强播放器**: 单视频/对照模式、慢速播放、镜面翻转、AB 循环
+- **录制与上传**: 浏览器录制、上传到云端、元信息填写
+- **AI 分析**: 后端队列异步分析 + 评分/弹幕提示（可选 LLM 点评）
 
 ### 🎬 播放器特色功能
 - **⏱️ 播放速度调节**: 0.5x - 1.5x，每次增加 0.1x，共 11 档速度
 - **🪞 镜面翻转**: 一键切换镜像模式，方便对镜练习
 - **🔄 AB 循环**: 设置起止点，重复练习难点动作
+- **🎯 单/双视频对照**: 教学视频与练习视频同步比对
+- **🧩 视频裁剪**: 前端裁剪（Canvas + ffmpeg.wasm），可接入云端裁剪
+- **💬 弹幕提示**: 根据分析结果显示实时提示
+
+## ✅ 当前实际功能
+- 账号注册/登录、JWT 鉴权
+- 视频上传、列表、播放、删除
+- 练习录制、元信息填写、上传
+- 单视频与对照模式切换
+- 慢速播放/镜像/AB 循环
+- AI 评分与弹幕提示（基于姿态检测）
+- 异步分析队列（RabbitMQ）+ 缓存（Redis）
 
 ## 🏗️ 技术栈
 
 ### 后端
 - **语言**: Go 1.20+
-- **框架**: Gorilla Mux (路由)
+- **路由**: Gorilla Mux
+- **ORM**: GORM（AutoMigrate）
 - **数据库**: MySQL 8.0
+- **缓存**: Redis
+- **队列**: RabbitMQ（裁剪/分析任务）
+- **搜索**: Elasticsearch
+- **对象存储**: MinIO（可选）/ 本地存储
+- **观测性**: OpenTelemetry + 自定义 Logger
 - **认证**: JWT (JSON Web Tokens)
 - **文件上传**: Multipart Form Data
 
 ### 前端
 - **纯原生**: HTML5 + CSS3 + JavaScript
 - **视频播放**: HTML5 Video API
+- **姿态检测**: TensorFlow.js + MoveNet
+- **裁剪**: Canvas + ffmpeg.wasm
 - **存储**: LocalStorage (Token 管理)
+- **PWA**: service-worker + manifest
+
+### AI/Worker
+- **语言**: Python
+- **姿态检测**: MediaPipe Pose
+- **视频处理**: OpenCV
+- **数据处理**: NumPy
+- **队列/缓存**: RabbitMQ + Redis
+- **LLM（可选）**: Google Gemini（google-generativeai）
 
 ### 数据库
 - **迁移工具**: golang-migrate
-- **表设计**: users, videos, schema_migrations
+- **表设计**: users, videos, practices, analysis_tasks, schema_migrations
 
 ## 📦 项目结构
 
@@ -49,8 +93,13 @@ DanceMirror/
 │   └── db.go               # 数据库连接
 ├── service/
 │   ├── auth/               # JWT 认证
+│   ├── cache/              # Redis
+│   ├── mq/                 # RabbitMQ
+│   ├── search/             # Elasticsearch
+│   ├── storage/            # MinIO/本地存储
 │   ├── user/               # 用户管理
 │   └── video/              # 视频管理
+├── ai_worker/              # Python AI Worker
 ├── types/
 │   └── types.go            # 类型定义
 ├── utils/
@@ -69,7 +118,11 @@ DanceMirror/
 ### 1. 环境要求
 - Go 1.20 或更高版本
 - MySQL 8.0 或更高版本
-- Git
+- Redis
+- RabbitMQ
+- Elasticsearch
+- （可选）MinIO
+- Git / Docker（推荐）
 
 ### 2. 克隆项目
 ```bash
@@ -140,10 +193,10 @@ POST /api/v1/register
 Content-Type: application/json
 
 {
-  "email": "user@example.com",
-  "password": "password123",
-  "firstName": "John",
-  "lastName": "Doe"
+	"email": "user@example.com",
+	"password": "password123",
+	"firstName": "John",
+	"lastName": "Doe"
 }
 ```
 
@@ -153,13 +206,13 @@ POST /api/v1/login
 Content-Type: application/json
 
 {
-  "email": "user@example.com",
-  "password": "password123"
+	"email": "user@example.com",
+	"password": "password123"
 }
 
 Response:
 {
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+	"token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 }
 ```
 
@@ -239,18 +292,28 @@ make migrate-status    # 查看状态
 - [ ] 上传进度条
 - [ ] 视频搜索和过滤
 - [ ] 响应式设计优化
+- [ ] ai姿态分析
+- [ ] 弹幕鼓励
 
-### Phase 3: 社交功能 (计划中)
-- [ ] 视频评论
-- [ ] 点赞和收藏
-- [ ] 用户关注
+### Phase 3: 社区功能 (计划中)
+- [ ] 视频评论/弹幕互动
+- [ ] 点赞/收藏/关注
+- [ ] 练习挑战与话题
 - [ ] 动态通知
 
-### Phase 4: 高级功能 (计划中)
-- [ ] 练习记录和统计
-- [ ] AI 动作分析
-- [ ] 视频转码和压缩
-- [ ] CDN 加速
+### Phase 4: 会员与高级功能 (计划中)
+- [ ] 练习记录与成长报告
+- [ ] AI 动作分析（更细粒度纠错 + 练习计划）
+- [ ] 会员内容：专业课程、高清素材、专属练习集
+- [ ] 会员权益：去广告、更多云端存储、批量导出
+- [ ] 视频转码与 CDN 加速
+
+## 🧩 已知问题/排查记录
+- 前端调用方法不一致：`getVideoAnalysis` 与 `getAIAnalysisResult` 命名不统一导致报错。
+- `DanmakuManager` 多处定义或未初始化，导致弹幕 `undefined`。
+- 弹幕容器缺失（`danmakuContainer` / `singleDanmakuContainer`）导致弹幕不显示。
+- 双/单视频模式缺少 `timeupdate` 驱动，弹幕不触发。
+- Redis 缓存旧分析结果，需要清空或使用新视频验证。
 
 ## 🤝 贡献
 

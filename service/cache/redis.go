@@ -87,7 +87,7 @@ func (r *RedisClient) Exists(ctx context.Context, key string) (bool, error) {
 }
 
 // 缓存用户的视频列表
-func (r *RedisClient) CacheUserVideos(ctx context.Context, userID int, videos []*types.Video) error {
+func (r *RedisClient) CacheUserVideos(ctx context.Context, userID int64, videos []*types.Video) error {
 	key := fmt.Sprintf("user:%d:videos", userID)
 	return r.Set(ctx, key, videos, 5*time.Minute) // 缓存5分钟
 }
@@ -110,7 +110,7 @@ func (r *RedisClient) GetVideoByID(ctx context.Context, videoID int) (*types.Vid
 }
 
 // 获取用户的视频列表缓存
-func (r *RedisClient) GetUserVideos(ctx context.Context, userID int) ([]*types.Video, error) {
+func (r *RedisClient) GetUserVideos(ctx context.Context, userID int64) ([]*types.Video, error) {
 	key := fmt.Sprintf("user:%d:videos", userID)
 	var videos []*types.Video
 	err := r.Get(ctx, key, &videos)
@@ -121,7 +121,7 @@ func (r *RedisClient) GetUserVideos(ctx context.Context, userID int) ([]*types.V
 }
 
 // 清除用户列表缓存
-func (r *RedisClient) ClearUserVideosCache(ctx context.Context, userID int) error {
+func (r *RedisClient) ClearUserVideosCache(ctx context.Context, userID int64) error {
 	key := fmt.Sprintf("user:%d:videos", userID)
 	return r.Delete(ctx, key)
 }

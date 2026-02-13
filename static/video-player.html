@@ -1437,6 +1437,7 @@
                             <div class="video-label teaching-label">📚 教学视频</div>
                             <video id="originalVideo" controls crossorigin="anonymous"></video>
                             <canvas id="teachSkeletonCanvas" class="skeleton-canvas"></canvas>
+                            <div id="danmakuContainer" class="danmaku-container"></div>
                             <div class="video-empty-state" id="originalVideoEmpty">
                                 <svg width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                     stroke-width="1.5">
@@ -1739,51 +1740,6 @@
         // utils
         function showMessage(text, type = 'info', timeout = 3000) { Utils.showMessage('message', text, type, timeout); }
 
-        // 如果 api.js 没更新，在这里自动补全缺失的云端裁剪方法
-        if (typeof DanceMirrorAPI !== 'undefined') {
-            if (!DanceMirrorAPI.cropVideoCloud) {
-                DanceMirrorAPI.cropVideoCloud = async (videoId, params) => {
-                    const token = localStorage.getItem('token');
-                    const res = await fetch(`/api/v1/videos/${videoId}/crop`, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(params)
-                    });
-                    if (!res.ok) throw new Error(`云端提交失败: ${res.status}`);
-                    return await res.json();
-                };
-            }
-            //补全获取分析结果的方法
-            if (!DanceMirrorAPI.getVideoAnalysis) {
-                DanceMirrorAPI.getVideoAnalysis = async (videoId) => {
-                    const token = localStorage.getItem('token');
-                    const res = await fetch(`/api/v1/videos/${videoId}/analysis`, {
-                        headers: {
-                            'Authorization': `Bearer ${token}`
-                        }
-                    });
-                    // 如果正在分析中或未找到，后端返回 200 + {status: processing}，由业务逻辑处理
-                    if (!res.ok) throw new Error('API Error');
-                    return await res.json();
-                };
-            }
-            //补全获取视频状态的方法
-            if (!DanceMirrorAPI.getVideoStatus) {
-                DanceMirrorAPI.getVideoStatus = async (videoId) => {
-                    const token = localStorage.getItem('token');
-                    const res = await fetch(`/api/v1/videos/${videoId}`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
-                    if (!res.ok) throw new Error('获取状态失败');
-                    return await res.json();
-                };
-            }
-        }
-
-
         window.onload = function () {
             if (!DanceMirrorAPI.isLoggedIn()) {
                 showMessage('请先登录，正在跳转...', 'error', 1500);
@@ -1889,16 +1845,11 @@
                 if (isSingleMode) return; // 单视频模式下不需要同步
                 // 根据当前播放时间，检查是否该发射弹幕
                 if (window.DanmakuManager) {
-                    window.DanmakuManager.update(originalVideo.currentTime, 'userDanmakuContainer');
+                    window.DanmakuManager.update(originalVideo.currentTime, 'danmakuContainer');
                 }
                 syncUserVideoTime();
             });
-            // 持续同步用户视频进度
-            originalVideo.addEventListener('timeupdate', () => {
-                if (isSingleMode) return; // 单视频模式下不需要同步
-                if (abLoopActive) return; // AB 循环模式下由循环逻辑接管
-                syncUserVideoTime();
-            });
+
             // 注意：timeupdate 事件在切换模式时需要特殊处理，见 initModeSwitcher
         }
 
@@ -1946,8 +1897,12 @@
                     try { singleVideo.currentTime = 0; singleVideo.play().catch(() => { }); } catch (e) { }
                 }
             });
-
-            // 新增：单视频循环播放按钮逻辑
+    singleVideo.addEventListener('timeupdate', () => {
+        if (window.DanmakuManager && window.DanmakuManager.suggestions.length > 0) {
+            window.DanmakuManager.update(singleVideo.currentTime, 'singleDanmakuContainer');
+        }
+    });
+            // 单视频循环播放按钮逻辑
             const singleLoopBtn = document.getElementById('singleLoopToggle');
             singleLoopBtn.addEventListener('click', () => {
                 const shouldLoop = !singleVideo.loop;
@@ -2302,23 +2257,23 @@
             document.getElementById('actionSelectVideo').querySelector('.card-status').textContent = '已完成 ✓';
             document.getElementById('actionRecord').classList.remove('card-disabled');
 
-                        async function fetchAnalysisWithRetry(videoId, attempts = 5, delay = 2000) {
-                for (let i = 0; i < attempts; i++) {
-                    try {
-                        const res = await DanceMirrorAPI.getVideoAnalysis(videoId);
-                        console.log(`🔍 AI analysis attempt ${i+1}/${attempts}:`, res);
-                        if (res && Array.isArray(res.suggestions) && res.suggestions.length > 0) {
-                            return res;
-                        }
-                    } catch (err) {
-                        console.warn('AI analysis fetch error:', err);
-                    }
-                    // 等待后重试
-                    await new Promise(r => setTimeout(r, delay));
+    async function fetchAnalysisWithRetry(videoId, maxRetries = 5, delayMs = 1500) {
+        for (let i = 0; i < maxRetries; i++) {
+            try {
+                const result = await DanceMirrorAPI.getVideoAnalysis(videoId);
+                if (result && result.status === 'finished') {
+                    return result;
                 }
-                // 最后一次无建议也返回最后一次响应（可能为 empty/processing）
-                try { return await DanceMirrorAPI.getVideoAnalysis(videoId); } catch { return null; }
+                console.log(`⏳ 分析尚未完成，${delayMs}ms 后重试 (${i + 1}/${maxRetries})`);
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+            } catch (err) {
+                console.warn('AI analysis fetch error:', err);
+                if (i === maxRetries - 1) throw err;
+                await new Promise(resolve => setTimeout(resolve, delayMs));
             }
+        }
+        throw new Error('获取分析超时');
+    }
 
 
             try {
@@ -2327,7 +2282,7 @@
 
                 if (window.DanmakuManager && analysis && Array.isArray(analysis.suggestions) && analysis.suggestions.length > 0) {
                     // 1. 解析字符串数组 ["2.5秒: 内容"] 到对象数组，并保证 isSent = false
-                    const realDanmkus = analysis.suggestions.map(s => {
+                    const realDanmukus = analysis.suggestions.map(s => {
                         const match = s.match(/([\d.]+)秒[:：]\s*(.*)/);
                         if (match) {
                             return {
@@ -2344,10 +2299,12 @@
                     realDanmkus.unshift({ time: 0.5, text: "🤖 AI 深度分析已同环，播放时将自动提醒", type: "info", isSent: false });
 
                     // 3. 更新全局管理器并重置时间轴
-                    window.DanmakuManager.suggestions = realDanmkus;
-                    window.DanmakuManager.prevTime = 0;
+            window.DanmakuManager.suggestions = realDanmakus;
+            window.DanmakuManager.prevTime = 0; // ← 这行是关键！
+            window.DanmakuManager.lastTriggerTime = -1;
 
-                    showMessage('AI 分析数据更新', 'success', 2000);
+            console.log("✅ 弹幕数据已更新:", realDanmakus.length, "条");
+            showMessage('AI 分析数据已加载', 'success', 2000);
                 } else {
                     // 无分析建议时保留默认引导（确保 isSent=false）
                     if (window.DanmakuManager) {
@@ -3461,6 +3418,63 @@
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
 
     <script>
+                    // 弹幕管理器
+            window.DanmakuManager = {
+                // 模拟的 AI 建议数据 (真实场景下从后端 API 获取)
+                // 格式: { time: 秒数, text: "内容", type: "normal"|"good"|"warn" }
+                suggestions: [
+                    { time: 2.5, text: "🖐️ 右胳膊抬高一点！", type: "warn" },
+                    { time: 5.0, text: "✨ 那个旋转太帅了！", type: "good" },
+                    { time: 8.2, text: "膝盖不要内扣哦~", type: "warn" },
+                    { time: 12.0, text: "🔥 节奏感比上次进步了 5%！", type: "info" }
+                ],
+                prevTime: 0,
+                lastTriggerTime: -1,
+
+                // 发送弹幕
+                send(text, type = "normal", containerId) {
+                    const container = document.getElementById(containerId);
+                    if (!container) return;
+
+                    const item = document.createElement("div");
+                    item.className = `danmaku-item danmaku-${type}`;
+                    item.textContent = text;
+
+                    // 随机高度 (Top: 10% - 80%)，避免遮挡底部控制条
+                    // 如果是 info (总结) 类型，样式里已经强制居中了，这里不需要设 top
+                    if (type !== 'info') {
+                        const randomTop = Math.floor(Math.random() * 70) + 10;
+                        item.style.top = randomTop + "%";
+                    }
+
+                    container.appendChild(item);
+
+                    // 动画结束后移除元素，防止内存泄漏
+                    item.addEventListener("animationend", () => {
+                        item.remove();
+                    });
+                },
+
+                // 监听视频播放，触发弹幕
+                // 在 requestAnimationFrame 循环中调用
+                update(videoCurrentTime, containerId) {
+                    // 如果视频进度回退（重新播放或拖动进度条），重置已发送状态
+                    if (videoCurrentTime < this.prevTime) {
+                        this.suggestions.forEach(s => s.isSent = false);
+                    }
+                    this.prevTime = videoCurrentTime;
+
+                    // 检查当前应该触发的弹幕
+                    this.suggestions.forEach(item => {
+                        // 逻辑：时间到了且未发送过，且在当前时间 1 秒内（防止由于卡顿跳过）
+                        if (!item.isSent && videoCurrentTime >= item.time && videoCurrentTime < item.time + 1.0) {
+                            this.send(item.text, item.type, containerId);
+                            item.isSent = true;
+                        }
+                    });
+                }
+            };
+            
         (function () {
             console.log("🚀 正在加载 MoveNet (更稳定的 AI 模型)...");
 
@@ -3681,63 +3695,6 @@
                             ctx.beginPath();
                             ctx.arc(kp.x, kp.y, 5, 0, 2 * Math.PI);
                             ctx.fill();
-                        }
-                    });
-                }
-            };
-
-            // 弹幕管理器
-            window.DanmakuManager = {
-                // 模拟的 AI 建议数据 (真实场景下从后端 API 获取)
-                // 格式: { time: 秒数, text: "内容", type: "normal"|"good"|"warn" }
-                suggestions: [
-                    { time: 2.5, text: "🖐️ 右胳膊抬高一点！", type: "warn" },
-                    { time: 5.0, text: "✨ 那个旋转太帅了！", type: "good" },
-                    { time: 8.2, text: "膝盖不要内扣哦~", type: "warn" },
-                    { time: 12.0, text: "🔥 节奏感比上次进步了 5%！", type: "info" }
-                ],
-                prevTime: 0,
-                lastTriggerTime: -1,
-
-                // 发送弹幕
-                send(text, type = "normal", containerId) {
-                    const container = document.getElementById(containerId);
-                    if (!container) return;
-
-                    const item = document.createElement("div");
-                    item.className = `danmaku-item danmaku-${type}`;
-                    item.textContent = text;
-
-                    // 随机高度 (Top: 10% - 80%)，避免遮挡底部控制条
-                    // 如果是 info (总结) 类型，样式里已经强制居中了，这里不需要设 top
-                    if (type !== 'info') {
-                        const randomTop = Math.floor(Math.random() * 70) + 10;
-                        item.style.top = randomTop + "%";
-                    }
-
-                    container.appendChild(item);
-
-                    // 动画结束后移除元素，防止内存泄漏
-                    item.addEventListener("animationend", () => {
-                        item.remove();
-                    });
-                },
-
-                // 监听视频播放，触发弹幕
-                // 在 requestAnimationFrame 循环中调用
-                update(videoCurrentTime, containerId) {
-                    // 如果视频进度回退（重新播放或拖动进度条），重置已发送状态
-                    if (videoCurrentTime < this.prevTime) {
-                        this.suggestions.forEach(s => s.isSent = false);
-                    }
-                    this.prevTime = videoCurrentTime;
-
-                    // 检查当前应该触发的弹幕
-                    this.suggestions.forEach(item => {
-                        // 逻辑：时间到了且未发送过，且在当前时间 1 秒内（防止由于卡顿跳过）
-                        if (!item.isSent && videoCurrentTime >= item.time && videoCurrentTime < item.time + 1.0) {
-                            this.send(item.text, item.type, containerId);
-                            item.isSent = true;
                         }
                     });
                 }

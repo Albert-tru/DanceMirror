@@ -7,7 +7,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: dancemirror-app
-    ports: # ✅ 新增：把应用的端口暴露给你的电脑
+    ports: # 把应用的端口暴露给你的电脑
       - "8080:8080"
     environment:
       # 从 .env 文件读取或在此覆盖
@@ -76,7 +76,7 @@ services:
     networks:
       - dancemirror_dancemirror-network
 
-  # ⭐ 新增：Redis 服务
+  # Redis 服务
   redis:
     image: redis:7-alpine
     container_name: dancemirror-redis
@@ -91,7 +91,7 @@ services:
     networks:
       - dancemirror_dancemirror-network
 
-  #新增minio
+  # MinIO 服务
   minio:
     image: minio/minio
     container_name: dancemirror-minio
@@ -114,6 +114,7 @@ services:
       timeout: 5s
       retries: 5
 
+# RabbitMQ 服务
   rabbitmq:
     image: rabbitmq:3-management
     container_name: dancemirror-rabbitmq
@@ -131,6 +132,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+  
+# Elasticsearch 服务
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.9.0
     container_name: dancemirror-es
@@ -150,6 +153,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+# Jaeger 服务
   jaeger:
     image: jaegertracing/all-in-one:latest
     environment:
@@ -161,6 +166,8 @@ services:
     networks:
       - dancemirror_dancemirror-network
     restart: unless-stopped
+
+# AI 任务处理 Worker 服务
   worker:
     build:
       context: ./ai_worker

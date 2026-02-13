@@ -44,7 +44,12 @@ func main() {
 	}
 
 	// 2. 自动迁移数据库表
-	if err := database.AutoMigrate(&types.User{}, &types.Video{}); err != nil {
+	if err := database.AutoMigrate(
+		&types.User{},
+		&types.Video{},
+		&types.Practice{},
+		&types.AnalysisTask{},
+	); err != nil {
 		log.Fatal("Failed to migrate database:", err)
 	}
 

@@ -145,6 +145,24 @@ const DanceMirrorAPI = (function() {
                 method: 'GET'
             });
         },
+
+         // ✅ 添加别名以兼容旧代码
+        getVideoAnalysis: async (videoId) => {
+            return api.getAIAnalysisResult(videoId);
+        },
+
+        // ✅ 添加获取视频状态的方法
+        getVideoStatus: async (videoId) => {
+            return await request(`/videos/${videoId}`, {
+                method: 'GET'
+            });
+        },       
+
+        getVideo: async (videoId) => {
+            return await request(`/videos/${videoId}`, {
+                method: 'GET'
+            });
+        },
         
         // 兼容旧名称
         cropVideo: async (videoId, params) => {

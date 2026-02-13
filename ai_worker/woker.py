@@ -8,11 +8,17 @@ import redis
 import requests
 import os
 import time
+import google.generativeai as genai  # ✅ 新增引入
 
 # 配置 (最好从环境变量读)
 RABBITMQ_HOST = os.getenv('RABBITMQ_HOST', 'rabbitmq')
 REDIS_HOST = os.getenv('REDIS_HOST', 'redis')
 REDIS_PORT = 6379
+
+# ✅ 配置 Gemini API (从环境变量读取，如果没有则留空)
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')  # ⚠️ 请确保在 docker-compose 或环境变量中设置此值
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
 
 # 初始化 Redis
 r_cache = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=0)
@@ -31,6 +37,33 @@ def calculate_angle(a, b, c):
     if angle > 180.0: angle = 360-angle
     return angle
 
+# ✅ 新增：AI 教练 Agent 函数
+def ask_ai_coach(score, error_log):
+    """调用 LLM 生成点评"""
+    if not GEMINI_API_KEY:
+        return "AI 教练提示：请在后台配置 Gemini API Key 以解锁智能点评功能。"
+
+    try:
+        # 构建 Prompt
+        prompt = f"""
+        你是一位专业的街舞教练。
+        我刚刚跳了一段舞，机器评分是 {score}/100。
+        主要检测到的问题列表：{str(error_log)}
+        
+        请你生成一段简短的点评（100字以内）：
+        1. 语气要像真人口语，有时严厉有时鼓励，带一点街舞圈的黑话（比如 vibe, swish, power）。
+        2. 先根据分数给个整体评价。
+        3. 针对那个出现最多次的问题给一个具体的修改建议。
+        4. 不要使用 markdown 格式。
+        """
+        
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        response = model.generate_content(prompt)
+        return response.text.strip()
+    except Exception as e:
+        print(f"❌ LLM 调用失败: {e}")
+        return f"AI 教练正忙，但他看到你得了 {score} 分，继续加油！"
+
 def analyze_video(video_url, task_id):
     print(f"📥 下载视频: {video_url}")
     
@@ -41,6 +74,12 @@ def analyze_video(video_url, task_id):
     frame_count = 0
     total_score = 0
     valid_frames = 0
+    
+    # ✅ 记录具体的错误类型 tally
+    error_stats = {
+        "arm_too_low": 0,
+        "timing_off": 0
+    }
 
     # ✅ 无论如何都加一条弹幕建议
     suggestions.append("1.0秒: AI 教练已开始为你分析动作，请注意动作幅度！")
@@ -75,7 +114,10 @@ def analyze_video(video_url, task_id):
             # 规则：如果你在做“扩胸”或“举手”，角度应该 > 80度
             # 这里的规则可以写得很复杂，为了演示简单点：
             if armpit_angle < 45:
-                suggestions.append(f"{frame_count/30:.1f}秒: 右胳膊抬得不够高哦！用力！")
+                # 限制弹幕密度：每2秒（约60帧）最多发一条同样的
+                if frame_count % 60 == 0:
+                    suggestions.append(f"{frame_count/30:.1f}秒: 右胳膊抬得不够高哦！({int(armpit_angle)}°)")
+                error_stats["arm_too_low"] += 1
             else:
                 total_score += 1 # 简单的加分逻辑
                 
@@ -86,11 +128,20 @@ def analyze_video(video_url, task_id):
     final_score = int((total_score / valid_frames) * 100) if valid_frames > 0 else 0
     final_score = min(100, max(60, final_score)) # 修正到 60-100 区间鼓励用户
     
+    # ✅ 调用 AI Agent 生成最终点评
+    print("🤖 正在请求 AI 教练生成点评...")
+    ai_comment = ask_ai_coach(final_score, error_stats)
+    
+    # 将 AI 点评作为第 0 秒的弹幕，或者放在前端特定的显示的区域
+    # 这里我们把它加进 suggestions 列表的最前面，用特殊前缀标识
+    suggestions.insert(0, f"0.5秒: 【AI总评】{ai_comment}")
+
     # 结果打包
-    print("DEBUG suggestions:", suggestions)
+    print(f"DEBUG suggestions count: {len(suggestions)}")
     result = {
         "score": final_score,
-        "suggestions": suggestions[:5],  # 不用 set，直接切片
+        "suggestions": suggestions,  
+        "ai_summary": ai_comment, # ✅ 单独存一个字段方便前端读取
         "status": "finished",
         "create_time": time.time()
     }
@@ -139,14 +190,12 @@ def start_worker():
                 exchange_type='direct',
                 durable=True
             )
-            print("✅ 死信交换机已声明")
             
             # ✅ 声明死信队列
             channel.queue_declare(
                 queue='video_analyze_queue_dlq',
                 durable=True
             )
-            print("✅ 死信队列已声明")
             
             # ✅ 绑定死信队列
             channel.queue_bind(
@@ -154,7 +203,6 @@ def start_worker():
                 queue='video_analyze_queue_dlq',
                 routing_key='video_analyze_queue_dlq'
             )
-            print("✅ 死信队列已绑定")
             
             # ✅ 声明主队列
             channel.queue_declare(
@@ -165,7 +213,7 @@ def start_worker():
                     'x-dead-letter-routing-key': 'video_analyze_queue_dlq'
                 }
             )
-            print("✅ 主队列已声明")
+            print("✅ 队列系统声明完毕")
             
             channel.basic_qos(prefetch_count=1)
             channel.basic_consume(queue='video_analyze_queue', on_message_callback=callback)
@@ -187,4 +235,8 @@ def start_worker():
 
 if __name__ == '__main__':
     print("🚀 DanceMirror AI Worker 启动")
+    if not GEMINI_API_KEY:
+        print("⚠️ 警告: 未检测到 GEMINI_API_KEY，智能点评功能将不可用")
+    else:
+        print("✨ Gemini AI Agent 已激活")
     start_worker()

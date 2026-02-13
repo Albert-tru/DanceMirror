@@ -34,7 +34,7 @@ func (s *Store) GetUserByPhone(phone string) (*types.User, error) {
 	return &user, nil
 }
 
-func (s *Store) GetUserByID(id int) (*types.User, error) {
+func (s *Store) GetUserByID(id int64) (*types.User, error) {
 	var user types.User
 	result := s.db.First(&user, id)
 	if result.Error != nil {

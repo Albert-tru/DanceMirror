@@ -170,7 +170,7 @@ func (m *mockUserStore) GetUserByEmail(email string) (*types.User, error) {
 	return &user, err
 }
 
-func (m *mockUserStore) GetUserByID(id int) (*types.User, error) {
+func (m *mockUserStore) GetUserByID(id int64) (*types.User, error) {
 	var user types.User
 	err := m.db.First(&user, id).Error
 	return &user, err
@@ -506,7 +506,7 @@ func TestVideoCache(t *testing.T) {
 	redisAddr := "localhost:6379"
 	redisClient := redis.NewClient(&redis.Options{Addr: redisAddr, DB: 1})
 	ctx := context.Background()
-	userVideosCacheKey := "user:" + strconv.Itoa(testUser.ID) + ":videos"
+	userVideosCacheKey := "user:" + strconv.FormatInt(testUser.ID, 10) + ":videos"
 
 	// 1. 首次请求视频列表，应该是缓存未命中
 	t.Run("should miss cache on first request", func(t *testing.T) {

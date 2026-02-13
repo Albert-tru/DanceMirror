@@ -4,3 +4,5 @@ numpy==1.23.5
 redis
 requests
 opencv-python-headless==4.8.1.78
+# 新增 Google Generative AI SDK
+google-generativeai

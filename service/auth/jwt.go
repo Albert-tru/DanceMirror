@@ -18,14 +18,14 @@ type contextKey string
 
 const UserKey contextKey = "userID"
 
-func CreateJWT(secret []byte, userID int) (string, error) {
+func CreateJWT(secret []byte, userID int64) (string, error) {
 	expiration, err := time.ParseDuration(config.Envs.JWTExpiration)
 	if err != nil {
 		expiration = time.Hour * 72
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"userID":    strconv.Itoa(userID),
+		"userID":    strconv.FormatInt(userID, 10),
 		"expiresAt": time.Now().Add(expiration).Unix(),
 	})
 
@@ -57,7 +57,7 @@ func WithJWTAuth(handlerFunc http.HandlerFunc, store types.UserStore) http.Handl
 		claims := token.Claims.(jwt.MapClaims)
 		str := claims["userID"].(string)
 
-		userID, err := strconv.Atoi(str)
+		userID, err := strconv.ParseInt(str, 10, 64) // 改为 ParseInt 获取 int64
 		if err != nil {
 			log.Printf("failed to convert userID to int: %v", err)
 			permissionDenied(w)
@@ -92,8 +92,8 @@ func permissionDenied(w http.ResponseWriter) {
 	utils.WriteError(w, http.StatusForbidden, fmt.Errorf("permission denied"))
 }
 
-func GetUserIDFromContext(ctx context.Context) int {
-	userID, ok := ctx.Value(UserKey).(int)
+func GetUserIDFromContext(ctx context.Context) int64 {
+	userID, ok := ctx.Value(UserKey).(int64)
 	if !ok {
 		return -1
 	}
