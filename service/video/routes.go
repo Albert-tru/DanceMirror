@@ -12,12 +12,14 @@ import (
 	"time"
 
 	"github.com/Albert-tru/DanceMirror/config"
+	"github.com/Albert-tru/DanceMirror/pkg/ratelimit"
 	"github.com/Albert-tru/DanceMirror/service/auth"
 	"github.com/Albert-tru/DanceMirror/service/cache"
 	"github.com/Albert-tru/DanceMirror/service/search"
 	"github.com/Albert-tru/DanceMirror/service/storage"
 	"github.com/Albert-tru/DanceMirror/types"
 	"github.com/Albert-tru/DanceMirror/utils"
+
 	"github.com/golang/groupcache/singleflight"
 	"github.com/gorilla/mux"
 	"github.com/minio/minio-go/v7"
@@ -33,6 +35,7 @@ type Handler struct {
 	publishAnalyze func(task map[string]interface{}) error
 	esClient       *search.ESClient
 	sf             singleflight.Group
+	limiter        *ratelimit.Limiter
 }
 
 func NewHandler(
@@ -52,6 +55,8 @@ func NewHandler(
 		publishCrop:    publishCrop,
 		publishAnalyze: publishAnalyze,
 		esClient:       esClient,
+		sf:             singleflight.Group{},
+		limiter:        ratelimit.NewLimiter(),
 	}
 }
 
@@ -83,13 +88,21 @@ func (h *Handler) getMiniOClient() *minio.Client {
 	return client
 }
 
-// ✅ 核心修复：处理前端发来的裁剪指令
+// 处理前端发来的裁剪指令
 func (h *Handler) handleDispatchCropTask(w http.ResponseWriter, r *http.Request) {
 	// 1. 获取 Video ID
 	vars := mux.Vars(r)
 	videoID, err := strconv.Atoi(vars["id"])
+	userID := auth.GetUserIDFromContext(r.Context())
 	if err != nil {
 		utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("invalid video id"))
+		return
+	}
+
+	// 限流：每个用户每分钟最多发起 2 个裁剪任务
+	key := fmt.Sprintf("crop:%d:%d", userID, videoID)
+	if ok, resetAt := h.limiter.Allow(key, 1, time.Minute); !ok {
+		writeRateLimited(w, resetAt, "please wait before cropping again")
 		return
 	}
 
@@ -300,6 +313,21 @@ PERMISSION_CHECK:
 }
 
 func (h *Handler) handleUpload(w http.ResponseWriter, r *http.Request) {
+
+	// 限流: 每个用户每分钟最多上传 2 个视频
+	userID := auth.GetUserIDFromContext(r.Context())
+	if ok, resetAt := h.limiter.Allow(fmt.Sprintf("upload:user:%d", userID), 2, time.Minute); !ok {
+		writeRateLimited(w, resetAt, "upload limit exceeded for user")
+		return
+	}
+
+	// 限流: 每个IP每分钟最多上传 10 个视频（防止恶意攻击/带宽耗尽）
+	clientIP := ratelimit.ClientIP(r)
+	if ok, resetAt := h.limiter.Allow("upload:ip:"+clientIP, 10, time.Minute); !ok {
+		writeRateLimited(w, resetAt, "upload limit exceeded for IP")
+		return
+	}
+
 	// 1. 限制上传大小 (例如 500MB)
 	r.Body = http.MaxBytesReader(w, r.Body, 500<<20)
 	if err := r.ParseMultipartForm(500 << 20); err != nil {
@@ -316,8 +344,6 @@ func (h *Handler) handleUpload(w http.ResponseWriter, r *http.Request) {
 	defer file.Close()
 
 	// 3. 构建视频元数据对象
-	userID := auth.GetUserIDFromContext(r.Context())
-
 	// a. 获取文件后缀 (如 .mp4)
 	ext := filepath.Ext(header.Filename)
 
@@ -508,8 +534,25 @@ func (h *Handler) handleDispatchAnalyze(w http.ResponseWriter, r *http.Request) 
 	// 1. 获取 Video ID
 	vars := mux.Vars(r)
 	videoID, err := strconv.Atoi(vars["id"])
+	userID := auth.GetUserIDFromContext(r.Context())
 	if err != nil {
 		utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("invalid video id"))
+		return
+	}
+
+	// 限流：Analyze (用户+视频维度: 1次/5分钟)
+	// AI 分析很慢，不允许短时间内重复提交同一视频
+	key := fmt.Sprintf("analyze:%d:%d", userID, videoID)
+	if ok, resetAt := h.limiter.Allow(key, 1, 5*time.Minute); !ok {
+		writeRateLimited(w, resetAt, "analysis already in progress or compliant limit")
+		return
+	}
+
+	// 限流：Analyze (用户全局: 2次/分钟)
+	// 防止单个用户并发提交太多任务阻塞队列
+	userKey := fmt.Sprintf("analyze:user:%d", userID)
+	if ok, resetAt := h.limiter.Allow(userKey, 2, time.Minute); !ok {
+		writeRateLimited(w, resetAt, "too many analysis requests")
 		return
 	}
 
@@ -590,4 +633,13 @@ func (h *Handler) handleGetAnalysis(w http.ResponseWriter, r *http.Request) {
 
 	// 4. 返回分析报告
 	utils.WriteJSON(w, http.StatusOK, result)
+}
+
+func writeRateLimited(w http.ResponseWriter, resetAt time.Time, msg string) {
+	retryAfter := int(time.Until(resetAt).Seconds())
+	if retryAfter < 1 {
+		retryAfter = 1
+	}
+	w.Header().Set("Retry-After", strconv.Itoa(retryAfter))
+	utils.WriteError(w, http.StatusTooManyRequests, fmt.Errorf("%s", msg))
 }
