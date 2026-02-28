@@ -3,6 +3,7 @@ package cache
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -15,6 +16,13 @@ import (
 type RedisClient struct {
 	client *redis.Client // 底层 Redis 客户端
 }
+
+var (
+	ErrCacheMiss = errors.New("cache miss")
+	ErrCacheNull = errors.New("cache null")
+)
+
+const nullSentinel = "__nil__"
 
 // NewRedisClient 创建 Redis 客户端
 // addr 格式：localhost:6379
@@ -95,18 +103,41 @@ func (r *RedisClient) CacheUserVideos(ctx context.Context, userID int64, videos 
 // 缓存单个视频
 func (r *RedisClient) CacheVideoByID(ctx context.Context, video *types.Video) error {
 	key := fmt.Sprintf("video:%d", video.ID)
-	return r.Set(ctx, key, video, 10*time.Minute) // 缓存10分钟
+	ttl := 10*time.Minute + time.Duration(video.ID%5)*time.Minute // 基础10分钟 + 0-4分钟的随机时间，避免缓存雪崩
+	return r.Set(ctx, key, video, ttl)                            // 过期时间设置为10-15分钟，增加随机性，避免缓存雪崩
 }
 
 // 获取单个视频缓存
 func (r *RedisClient) GetVideoByID(ctx context.Context, videoID int) (*types.Video, error) {
 	key := fmt.Sprintf("video:%d", videoID)
 	var video types.Video
-	err := r.Get(ctx, key, &video)
-	if err != nil {
-		return nil, err //缓存未命中
+
+	// 从 Redis 获取
+	data, err := r.client.Get(ctx, key).Result()
+	if err == redis.Nil {
+		return nil, ErrCacheMiss // 缓存未命中
 	}
-	return &video, err
+	if err != nil {
+		return nil, err // 其他 Redis 错误
+	}
+
+	// 检查是否是空值缓存
+	if data == "__nil__" {
+		return nil, ErrCacheNull // 空值缓存命中
+	}
+
+	// 反序列化
+	if err := json.Unmarshal([]byte(data), &video); err != nil {
+		return nil, err
+	}
+
+	return &video, nil
+}
+
+// 缓存空值
+func (r *RedisClient) CacheNullVideoByID(ctx context.Context, videoID int) error {
+	key := fmt.Sprintf("video:%d", videoID)
+	return r.client.Set(ctx, key, "__nil__", time.Minute*2).Err() // 空值缓存，过期时间 2 分钟
 }
 
 // 获取用户的视频列表缓存

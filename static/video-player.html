@@ -9,6 +9,18 @@
 
     <link rel="stylesheet" href="/static/css/common.css">
     <link rel="stylesheet" href="/static/css/video-player.css">
+    
+    <!-- ✅ 把所有依赖提前到 head 加载 -->
+    <script src="/static/js/utils.js"></script>
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/danmaku.js"></script>
+
+    <!-- ✅ TensorFlow 也提前 -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
+    
     <style>
         /* AI 评分面板 */
         .ai-score-board {
@@ -1716,8 +1728,6 @@
         const originalVideo = document.getElementById('originalVideo');
         const userVideo = document.getElementById('userVideo');
         const singleVideo = document.getElementById('singleVideo');
-        const singleVideoTitle = document.getElementById('singleVideoTitle');
-        const singleVideoDesc = document.getElementById('singleVideoDesc');
         const offsetRange = document.getElementById('offsetRange');
         const offsetLabel = document.getElementById('offsetLabel');
         const recTimer = document.getElementById('recTimer');
@@ -2199,6 +2209,25 @@
             }
         }
 
+        // 把 fetchAnalysisWithRetry 移出 selectVideo，作为独立函数
+        async function fetchAnalysisWithRetry(videoId, maxRetries = 5, delayMs = 1500) {
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const result = await DanceMirrorAPI.getVideoAnalysis(videoId);
+                    if (result && result.status === 'finished') {
+                        return result;
+                    }
+                    console.log(`⏳ 分析尚未完成，${delayMs}ms 后重试 (${i + 1}/${maxRetries})`);
+                    await new Promise(resolve => setTimeout(resolve, delayMs));
+                } catch (err) {
+                    console.warn('AI analysis fetch error:', err);
+                    if (i === maxRetries - 1) throw err;
+                    await new Promise(resolve => setTimeout(resolve, delayMs));
+                }
+            }
+            throw new Error('获取分析超时');
+        }
+
         async function selectVideo(video, itemEl) {
             currentVideoId = video.id;
             let videoPath = video.filePath || '';
@@ -2215,115 +2244,77 @@
                 }
             }
             originalVideo.src = videoPath;
-            singleVideo.src = videoPath; // ✅ 同时设置单视频模式的源
+            singleVideo.src = videoPath;
             originalVideo.load();
-            singleVideo.load(); // ✅ 加载单视频模式的视频
+            singleVideo.load();
 
             originalVideo.addEventListener('loadedmetadata', () => {
                 const wrapper = originalVideo.closest('.video-player-wrapper');
                 if (wrapper && originalVideo.videoWidth && originalVideo.videoHeight) {
-                    wrapper.style.cssText = `
-            aspect-ratio: ${originalVideo.videoWidth} / ${originalVideo.videoHeight} !important;
-            height: auto !important;
-            min-height: unset !important;
-            max-height: unset !important;
-            width: 100%;
-            position: relative !important;
-        `;
+                    wrapper.style.cssText = `aspect-ratio: ${originalVideo.videoWidth} / ${originalVideo.videoHeight} !important; height: auto !important; min-height: unset !important; max-height: unset !important; width: 100%; position: relative !important;`;
                 }
             }, { once: true });
 
             singleVideo.addEventListener('loadedmetadata', () => {
                 const wrapper = singleVideo.closest('.video-player-wrapper');
                 if (wrapper && singleVideo.videoWidth && singleVideo.videoHeight) {
-                    wrapper.style.cssText = `
-            aspect-ratio: ${singleVideo.videoWidth} / ${singleVideo.videoHeight} !important;
-            height: auto !important;
-            min-height: unset !important;
-            max-height: unset !important;
-            width: 100%;
-            position: relative !important;
-        `;
+                    wrapper.style.cssText = `aspect-ratio: ${singleVideo.videoWidth} / ${singleVideo.videoHeight} !important; height: auto !important; min-height: unset !important; max-height: unset !important; width: 100%; position: relative !important;`;
                 }
             }, { once: true });
-
 
             document.querySelectorAll('.video-item').forEach(i => i.classList.remove('active'));
             if (itemEl) itemEl.classList.add('active');
             clearABLoop();
 
-            // 更新快速操作卡片状态
             document.getElementById('actionSelectVideo').classList.remove('card-disabled');
             document.getElementById('actionSelectVideo').querySelector('.card-status').textContent = '已完成 ✓';
             document.getElementById('actionRecord').classList.remove('card-disabled');
 
-    async function fetchAnalysisWithRetry(videoId, maxRetries = 5, delayMs = 1500) {
-        for (let i = 0; i < maxRetries; i++) {
-            try {
-                const result = await DanceMirrorAPI.getVideoAnalysis(videoId);
-                if (result && result.status === 'finished') {
-                    return result;
-                }
-                console.log(`⏳ 分析尚未完成，${delayMs}ms 后重试 (${i + 1}/${maxRetries})`);
-                await new Promise(resolve => setTimeout(resolve, delayMs));
-            } catch (err) {
-                console.warn('AI analysis fetch error:', err);
-                if (i === maxRetries - 1) throw err;
-                await new Promise(resolve => setTimeout(resolve, delayMs));
-            }
-        }
-        throw new Error('获取分析超时');
-    }
-
-
+            // ✅ 弹幕加载逻辑（fetchAnalysisWithRetry 已移到外面）
             try {
                 const analysis = await fetchAnalysisWithRetry(video.id, 5, 1500);
                 console.log("🔍 收到后端 AI 分析数据:", analysis);
 
                 if (window.DanmakuManager && analysis && Array.isArray(analysis.suggestions) && analysis.suggestions.length > 0) {
-                    // 1. 解析字符串数组 ["2.5秒: 内容"] 到对象数组，并保证 isSent = false
-                    const realDanmukus = analysis.suggestions.map(s => {
+                    const realDanmakus = analysis.suggestions.map(s => {
                         const match = s.match(/([\d.]+)秒[:：]\s*(.*)/);
                         if (match) {
-                            return {
-                                time: parseFloat(match[1]),
-                                text: match[2],
-                                type: (match[2].includes("好") || match[2].includes("完美")) ? "good" : "warn",
-                                isSent: false
-                            };
+                            const time = parseFloat(match[1]);
+                            const text = match[2];
+                            let type = "normal";
+                            if (text.includes("完美") || text.includes("太棒") || text.includes("很好")) type = "good";
+                            else if (text.includes("注意") || text.includes("不够") || text.includes("！")) type = "warn";
+                            else if (text.includes("总评") || text.includes("AI")) type = "info";
+                            return { time, text, type, isSent: false };
                         }
                         return null;
                     }).filter(x => x !== null);
 
-                    // 2. 添加欢迎弹幕并保证未发送
-                    realDanmkus.unshift({ time: 0.5, text: "🤖 AI 深度分析已同环，播放时将自动提醒", type: "info", isSent: false });
+                    realDanmakus.unshift({
+                        time: 0.5,
+                        text: "🤖 AI 深度分析已同步，播放时将自动提醒",
+                        type: "info",
+                        isSent: false
+                    });
 
-                    // 3. 更新全局管理器并重置时间轴
-            window.DanmakuManager.suggestions = realDanmakus;
-            window.DanmakuManager.prevTime = 0; // ← 这行是关键！
-            window.DanmakuManager.lastTriggerTime = -1;
-
-            console.log("✅ 弹幕数据已更新:", realDanmakus.length, "条");
-            showMessage('AI 分析数据已加载', 'success', 2000);
+                    window.DanmakuManager.suggestions = realDanmakus;
+                    window.DanmakuManager.prevTime = 0;
+                    console.log("✅ 弹幕数据已更新:", realDanmakus.length, "条");
+                    showMessage('AI 分析数据已加载', 'success', 2000);
                 } else {
-                    // 无分析建议时保留默认引导（确保 isSent=false）
                     if (window.DanmakuManager) {
-                        window.DanmakuManager.suggestions = [
-                            { time: 1.0, text: "AI 实时评分已开启，请开始你的表演 💃", type: "info", isSent: false }
-                        ];
+                        window.DanmakuManager.suggestions = [{ time: 1.0, text: "AI 实时评分已开启，请开始你的表演 💃", type: "info", isSent: false }];
                         window.DanmakuManager.prevTime = 0;
                     }
                 }
             } catch (e) {
                 console.warn("此视频暂无 AI 深度分析数据", e);
                 if (window.DanmakuManager) {
-                    window.DanmakuManager.suggestions = [
-                        { time: 1.0, text: "AI 实时评分已开启，请开始你的表演 💃", type: "info", isSent: false }
-                    ];
+                    window.DanmakuManager.suggestions = [{ time: 1.0, text: "AI 实时评分已开启，请开始你的表演 💃", type: "info", isSent: false }];
                     window.DanmakuManager.prevTime = 0;
                 }
             }
-        }
+        }  // ✅ selectVideo 正确关闭        
         // ---------- mode switcher ----------
 
         function initModeSwitcher() {
@@ -3407,371 +3398,8 @@
         })();
     </script>
 
-    <!-- 基础工具库 -->
-    <script src="/static/js/utils.js"></script>
-    <script src="/static/js/api.js"></script>
-    <script src="/static/js/ai-scoring.js"></script>
-    <!-- ✅ 集成 MoveNet 姿态检测 (替代 MediaPipe Pose，更稳定) -->
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
-
-    <script>
-                    // 弹幕管理器
-            window.DanmakuManager = {
-                // 模拟的 AI 建议数据 (真实场景下从后端 API 获取)
-                // 格式: { time: 秒数, text: "内容", type: "normal"|"good"|"warn" }
-                suggestions: [
-                    { time: 2.5, text: "🖐️ 右胳膊抬高一点！", type: "warn" },
-                    { time: 5.0, text: "✨ 那个旋转太帅了！", type: "good" },
-                    { time: 8.2, text: "膝盖不要内扣哦~", type: "warn" },
-                    { time: 12.0, text: "🔥 节奏感比上次进步了 5%！", type: "info" }
-                ],
-                prevTime: 0,
-                lastTriggerTime: -1,
-
-                // 发送弹幕
-                send(text, type = "normal", containerId) {
-                    const container = document.getElementById(containerId);
-                    if (!container) return;
-
-                    const item = document.createElement("div");
-                    item.className = `danmaku-item danmaku-${type}`;
-                    item.textContent = text;
-
-                    // 随机高度 (Top: 10% - 80%)，避免遮挡底部控制条
-                    // 如果是 info (总结) 类型，样式里已经强制居中了，这里不需要设 top
-                    if (type !== 'info') {
-                        const randomTop = Math.floor(Math.random() * 70) + 10;
-                        item.style.top = randomTop + "%";
-                    }
-
-                    container.appendChild(item);
-
-                    // 动画结束后移除元素，防止内存泄漏
-                    item.addEventListener("animationend", () => {
-                        item.remove();
-                    });
-                },
-
-                // 监听视频播放，触发弹幕
-                // 在 requestAnimationFrame 循环中调用
-                update(videoCurrentTime, containerId) {
-                    // 如果视频进度回退（重新播放或拖动进度条），重置已发送状态
-                    if (videoCurrentTime < this.prevTime) {
-                        this.suggestions.forEach(s => s.isSent = false);
-                    }
-                    this.prevTime = videoCurrentTime;
-
-                    // 检查当前应该触发的弹幕
-                    this.suggestions.forEach(item => {
-                        // 逻辑：时间到了且未发送过，且在当前时间 1 秒内（防止由于卡顿跳过）
-                        if (!item.isSent && videoCurrentTime >= item.time && videoCurrentTime < item.time + 1.0) {
-                            this.send(item.text, item.type, containerId);
-                            item.isSent = true;
-                        }
-                    });
-                }
-            };
-            
-        (function () {
-            console.log("🚀 正在加载 MoveNet (更稳定的 AI 模型)...");
-
-            // COCO 关键点连接图 (标准骨架)
-            const CONNECTIONS = [
-                [0, 1], [0, 2], [1, 3], [2, 4], // 脸部
-                [5, 6], [5, 7], [7, 9], [6, 8], [8, 10], // 上肢
-                [5, 11], [6, 12], [11, 12], // 躯干
-                [11, 13], [13, 15], [12, 14], [14, 16] // 下肢
-            ];
-
-            window.AIContext = {
-                isEnabled: false,
-                detector: null,
-                isInitialized: false,
-                lastPoses: { teach: null, user: null },
-
-                async init() {
-                    if (this.isInitialized) return;
-
-                    const hint = document.getElementById('aiStatusHint');
-                    if (hint) {
-                        hint.textContent = "⏳ 加载 MoveNet 模型中...";
-                        hint.className = "ai-status-hint loading";
-                    }
-
-                    try {
-                        // 等待 TFJS 加载
-                        await window.tf.ready();
-                        console.log("✅ TFJS Backend:", window.tf.getBackend());
-
-                        // 创建检测器 (使用 Thunder 模型，精度高且快)
-                        const model = window.poseDetection.SupportedModels.MoveNet;
-                        const detectorConfig = {
-                            modelType: window.poseDetection.movenet.modelType.SINGLEPOSE_THUNDER
-                        };
-                        this.detector = await window.poseDetection.createDetector(model, detectorConfig);
-
-                        this.isInitialized = true;
-                        console.log("✅ MoveNet 模型加载完成！");
-                    } catch (e) {
-                        console.error("MoveNet 加载失败:", e);
-                        throw e;
-                    }
-                },
-
-                async start() {
-                    console.log("🚀 启动检测...");
-                    const toggle = document.getElementById('aiToggle');
-                    const hint = document.getElementById('aiStatusHint');
-
-                    if (toggle) toggle.disabled = true;
-
-                    try {
-                        await this.init();
-                        this.isEnabled = true;
-                        this.loop();
-
-                        // 播放视频
-                        const v = document.getElementById('singleVideo') || document.getElementById('originalVideo');
-                        if (v && v.paused) {
-                            v.play().catch(e => console.log("自动播放被拦截"));
-                        }
-
-                        if (hint) {
-                            hint.textContent = "✅ AI 运行中";
-                            hint.className = "ai-status-hint ready";
-                        }
-                    } catch (e) {
-                        alert("启动失败: " + e.message);
-                        if (toggle) toggle.checked = false;
-                    } finally {
-                        if (toggle) toggle.disabled = false;
-                    }
-                },
-
-                stop() {
-                    this.isEnabled = false;
-                    this.lastPoses = { teach: null, user: null };
-                    // 清空画布
-                    ['singleSkeletonCanvas', 'teachSkeletonCanvas', 'userSkeletonCanvas'].forEach(id => {
-                        const c = document.getElementById(id);
-                        if (c) c.getContext('2d').clearRect(0, 0, c.width, c.height);
-                    });
-                    const hint = document.getElementById('aiStatusHint');
-                    if (hint) hint.textContent = "已关闭";
-                    // 隐藏评分面板
-                    const board = document.getElementById('aiScoreBoard');
-                    if (board) board.classList.add('hidden');
-                    console.log("🛑 AI 已停止");
-                },
-
-                async loop() {
-                    if (!this.isEnabled) return;
-
-                    const isSingle = document.body.classList.contains('mode-single');
-                    const videos = [
-                        { type: 'teach', vid: isSingle ? 'singleVideo' : 'originalVideo', cid: isSingle ? 'singleSkeletonCanvas' : 'teachSkeletonCanvas' },
-                        { type: 'user', vid: 'userVideo', cid: 'userSkeletonCanvas' }
-                    ];
-
-                    for (const item of videos) {
-                        // 如果是单人模式，跳过用户视频处理
-                        if (isSingle && item.vid === 'userVideo') continue;
-
-                        const video = document.getElementById(item.vid);
-                        const canvas = document.getElementById(item.cid);
-
-                        if (video && canvas && !video.paused && video.readyState >= 2) {
-                            // 1. 调整尺寸
-                            if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
-                                canvas.width = video.videoWidth || video.offsetWidth;
-                                canvas.height = video.videoHeight || video.offsetHeight;
-                            }
-
-                            try {
-                                // 2. 检测姿态
-                                const poses = await this.detector.estimatePoses(video);
-
-                                // 3. 绘制
-                                const ctx = canvas.getContext('2d');
-                                ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-                                if (poses.length > 0) {
-                                    this.drawSkeleton(ctx, poses[0].keypoints);
-                                    // 将当前关键点存入 lastPoses
-                                    this.lastPoses[item.type] = poses[0].keypoints;
-                                }
-                                else {
-                                    this.lastPoses[item.type] = null;
-                                }
-                            } catch (e) {
-                                console.warn("检测帧失败:", e);
-                            }
-                        }
-                    }
-                    // 检测完视频后计算分数并更新ui
-                    this.updateSimilarityScore();
-                    requestAnimationFrame(() => this.loop());
-                },
-
-                // ✅ 4. 计算相似度并更新 UI
-                updateSimilarityScore() {
-                    const board = document.getElementById('aiScoreBoard');
-                    const scoreEl = document.getElementById('liveScore');
-                    const commentEl = document.getElementById('scoreComment');
-
-                    if (!this.lastPoses.teach || !this.lastPoses.user) {
-                        // 如果有人没出现在画面里，不显示分数
-                        if (commentEl) commentEl.textContent = "准备中...";
-                        return;
-                    }
-
-                    // 显示评分面板
-                    if (board) board.classList.add('active');
-
-                    // 计算逻辑：简单的欧几里得距离对比
-                    const score = this.calculateScore(this.lastPoses.teach, this.lastPoses.user);
-                    const finalScore = Math.floor(score * 100);
-
-                    // 更新数字
-                    if (scoreEl) scoreEl.textContent = finalScore;
-
-                    // 更新评价文案
-                    if (commentEl) {
-                        if (finalScore > 85) commentEl.textContent = "太完美了! 🔥";
-                        else if (finalScore > 70) commentEl.textContent = "动作很准 👍";
-                        else if (finalScore > 50) commentEl.textContent = "继续加油 💪";
-                        else commentEl.textContent = "跟上节奏 🎵";
-                    }
-                },
-
-                // 新增数学算法
-                calculateScore(kp1, kp2) {
-                    // 只对比核心的 12 个关键点 (肩、肘、手、胯、膝、足)
-                    const coreIndices = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
-                    let totalSim = 0;
-                    let count = 0;
-
-                    coreIndices.forEach(idx => {
-                        const p1 = kp1[idx];
-                        const p2 = kp2[idx];
-
-                        if (p1.score > 0.3 && p2.score > 0.3) {
-                            // 归一化坐标差异 (此处简化处理)
-                            const dx = Math.abs(p1.x - p2.x) / 300; // 假设误差阈值为300像素
-                            const dy = Math.abs(p1.y - p2.y) / 300;
-                            const diff = Math.min(1, (dx + dy) / 2);
-                            totalSim += (1 - diff);
-                            count++;
-                        }
-                    });
-
-                    return count > 0 ? totalSim / count : 0;
-                },
-
-                drawSkeleton(ctx, keypoints) {
-                    const minConfidence = 0.3;
-
-                    // 绘制线条
-                    ctx.strokeStyle = '#00FF00';
-                    ctx.lineWidth = 3;
-                    CONNECTIONS.forEach(([i, j]) => {
-                        const kp1 = keypoints[i];
-                        const kp2 = keypoints[j];
-                        if (kp1.score > minConfidence && kp2.score > minConfidence) {
-                            ctx.beginPath();
-                            ctx.moveTo(kp1.x, kp1.y);
-                            ctx.lineTo(kp2.x, kp2.y);
-                            ctx.stroke();
-                        }
-                    });
-
-                    // 绘制关键点
-                    keypoints.forEach(kp => {
-                        if (kp.score > minConfidence) {
-                            ctx.fillStyle = '#FF0000';
-                            ctx.beginPath();
-                            ctx.arc(kp.x, kp.y, 5, 0, 2 * Math.PI);
-                            ctx.fill();
-                        }
-                    });
-                }
-            };
-
-            // 解析后端文本为弹幕对象
-            function parseSuggestionsToDanmaku(apiSuggestions) {
-                const danmakuList = [];
-                apiSuggestions.forEach(str => {
-                    // 使用正则提取时间 "2.5秒: 内容"
-                    const match = str.match(/([\d.]+)秒[:：]\s*(.*)/);
-                    if (match) {
-                        danmakuList.push({
-                            time: parseFloat(match[1]),
-                            text: match[2],
-                            type: "warn" // 默认警告类型
-                        });
-                    }
-                });
-                // 添加最后的分数弹幕
-                danmakuList.push({ time: 0.5, text: "AI 分析已准备就绪 🤖", type: "good" });
-
-                // 更新管理器数据
-                DanmakuManager.suggestions = danmakuList;
-            }
-
-            // 绑定开关 (修复版：使用 onclick 而不是 addEventListener，防止重复或失效)
-            function initAIToggle() {
-                const toggle = document.getElementById('aiToggle');
-                const hint = document.getElementById('aiStatusHint');
-
-                if (!toggle) {
-                    console.error("❌ 找不到 ID 为 'aiToggle' 的元素！请检查 HTML。");
-                    return;
-                }
-
-                console.log("✅ 成功找到 AI 开关按钮");
-
-                // 强制重置状态
-                toggle.checked = false;
-                toggle.disabled = false;
-                if (hint) hint.textContent = "骨架识别 (MoveNet)";
-
-                // 直接覆盖 onclick 事件，确保一定会触发
-                toggle.onclick = async function (e) {
-                    // 注意：onclick 触发时 checked 状态已经改变了
-                    const isChecked = e.target.checked;
-                    console.log("🖱️ 点击开关 ->", isChecked);
-
-                    if (isChecked) {
-                        // 开启
-                        if (window.AIContext) {
-                            await window.AIContext.start();
-                        } else {
-                            console.error("❌ AIContext 未定义");
-                            alert("AI 核心未加载，请刷新页面重试");
-                            e.target.checked = false;
-                        }
-                    } else {
-                        // 关闭
-                        if (window.AIContext) {
-                            window.AIContext.stop();
-                        }
-                    }
-                };
-            }
-
-            // 确保 DOM 加载完毕后执行
-            if (document.readyState === 'complete' || document.readyState === 'interactive') {
-                setTimeout(initAIToggle, 500); // 稍微延迟一点点，确保万无一失
-            } else {
-                document.addEventListener('DOMContentLoaded', () => setTimeout(initAIToggle, 500));
-            }
-
-        })();
-    </script>
-    </script>
+    <!-- ✅ 再定义 AIContext -->
+    <script src="/static/js/ai-movenet.js"></script>
+    
 </body>
-
 </html>

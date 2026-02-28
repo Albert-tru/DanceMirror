@@ -37,11 +37,33 @@ def calculate_angle(a, b, c):
     if angle > 180.0: angle = 360-angle
     return angle
 
-# ✅ 新增：AI 教练 Agent 函数
+# AI 教练 Agent 函数
 def ask_ai_coach(score, error_log):
-    """调用 LLM 生成点评"""
+    """
+    调用 Google Gemini API 生成个性化点评
+    
+    参数：
+    - score: 评分 (60-100)
+    - error_log: 错误统计 {"arm_too_low": 5, "timing_off": 2}
+    """
+
     if not GEMINI_API_KEY:
-        return "AI 教练提示：请在后台配置 Gemini API Key 以解锁智能点评功能。"
+        # ✅ 没有 API Key 时返回默认文案，不要返回 None！
+        errors = []
+        for key, count in error_log.items():
+            if key == 'arm_too_low' and count > 3:
+                errors.append(f"右臂抬高不够，出现{count}次")
+            elif key == 'timing_off' and count > 2:
+                errors.append(f"节奏有点跑偏，出现{count}次")
+        
+        if errors:
+            return f"分数 {score} 分。注意：{'；'.join(errors)}。继续加油！💪"
+        elif score >= 85:
+            return f"太棒了！分数 {score} 分，动作非常标准！🔥"
+        elif score >= 70:
+            return f"不错！分数 {score} 分，继续保持！👍"
+        else:
+            return f"分数 {score} 分，多练习就会越来越好！💃"
 
     try:
         # 构建 Prompt
@@ -63,8 +85,23 @@ def ask_ai_coach(score, error_log):
     except Exception as e:
         print(f"❌ LLM 调用失败: {e}")
         return f"AI 教练正忙，但他看到你得了 {score} 分，继续加油！"
+# 示例输出：
+# "你的 vibe 很足，分数 75 分。不过右臂抬得还是有点低，
+#  再往上提 10° 左右就完美了。加油兄弟，下次突破 85！"
+
 
 def analyze_video(video_url, task_id):
+    """
+    完整的视频分析流程：
+    1. 初始化模型
+    2. 逐帧处理视频
+    3. 检测关键点
+    4. 计算关节角度
+    5. 判断动作质量
+    6. 生成弹幕建议
+    7. 调用 LLM 生成点评
+    """
+
     print(f"📥 下载视频: {video_url}")
     
     # 下载视频流
@@ -75,13 +112,13 @@ def analyze_video(video_url, task_id):
     total_score = 0
     valid_frames = 0
     
-    # ✅ 记录具体的错误类型 tally
+    # 记录具体的错误类型 tally
     error_stats = {
         "arm_too_low": 0,
         "timing_off": 0
     }
 
-    # ✅ 无论如何都加一条弹幕建议
+    # 无论如何都加一条弹幕建议
     suggestions.append("1.0秒: AI 教练已开始为你分析动作，请注意动作幅度！")
 
     
@@ -128,7 +165,7 @@ def analyze_video(video_url, task_id):
     final_score = int((total_score / valid_frames) * 100) if valid_frames > 0 else 0
     final_score = min(100, max(60, final_score)) # 修正到 60-100 区间鼓励用户
     
-    # ✅ 调用 AI Agent 生成最终点评
+    # 调用 AI Agent 生成最终点评
     print("🤖 正在请求 AI 教练生成点评...")
     ai_comment = ask_ai_coach(final_score, error_stats)
     
@@ -141,7 +178,7 @@ def analyze_video(video_url, task_id):
     result = {
         "score": final_score,
         "suggestions": suggestions,  
-        "ai_summary": ai_comment, # ✅ 单独存一个字段方便前端读取
+        "ai_summary": ai_comment, # 单独存一个字段方便前端读取
         "status": "finished",
         "create_time": time.time()
     }
@@ -160,11 +197,12 @@ def callback(ch, method, properties, body):
         redis_key = f"analysis:video:{task['video_id']}"
         r_cache.set(redis_key, json.dumps(report), ex=86400)
         print(f"✅ 分析完成，结果已存入 Redis: {redis_key}")
+        ch.basic_ack(delivery_tag=method.delivery_tag)  # ✅ 成功才 ACK
         
     except Exception as e:
         print(f"❌ 分析失败: {e}")
-    
-    ch.basic_ack(delivery_tag=method.delivery_tag)
+        # ✅ 失败时 nack，requeue=False 让消息进入死信队列
+        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)        
 
 def start_worker():
     print("🔧 Worker 启动中...")

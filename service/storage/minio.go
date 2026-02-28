@@ -44,19 +44,17 @@ func NewMinIOStorage(endpoint, accessKey, secretKey, bucket string, useSSL bool)
 		}
 	}
 
-	// ⭐ 新增代码开始：自动将 Bucket 设置为公开只读 ⭐
+	// 自动将 Bucket 设置为公开只读
 	// 这样任何人都可以通过 http://localhost:9000/bucket/filename 直接访问文件
 	policy := fmt.Sprintf(`{
-"Version": "2012-10-17",
-"Statement": [
-{
-"Effect": "Allow",
-"Principal": {"AWS": ["*"]},
-"Action": ["s3:GetObject"],
-"Resource": ["arn:aws:s3:::%s/*"]
-}
-]
-}`, bucket)
+		"Version": "2012-10-17",
+		"Statement": [{
+			"Effect": "Allow",
+			"Principal": {"AWS": ["*"]},
+			"Action": ["s3:GetObject"],
+			"Resource": ["arn:aws:s3:::%s/*"]
+			}]
+		}`, bucket)
 
 	err = client.SetBucketPolicy(ctx, bucket, policy)
 	if err != nil {
@@ -65,7 +63,6 @@ func NewMinIOStorage(endpoint, accessKey, secretKey, bucket string, useSSL bool)
 	} else {
 		fmt.Println("✅ 成功设置 Bucket 为公开访问模式")
 	}
-	// ⭐ 新增代码结束 ⭐
 
 	return &MinIOStorage{
 		client: client,

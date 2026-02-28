@@ -3,6 +3,7 @@ package video
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"path/filepath"
@@ -233,6 +234,14 @@ func (h *Handler) handleGetVideo(w http.ResponseWriter, r *http.Request) {
 	// 1. 尝试从缓存获取 (利用 redis.go 中封装好的 GetVideoByID)
 	// GetVideoByID 内部调用了 r.Get(ctx, key, &video)
 	video, err := h.cache.GetVideoByID(ctx, id)
+	if err == nil {
+		goto PERMISSION_CHECK
+	}
+	if errors.Is(err, cache.ErrCacheNull) {
+		// 空值缓存命中，直接返回 404
+		utils.WriteError(w, http.StatusNotFound, fmt.Errorf("video not found"))
+		return
+	}
 
 	// 2. 缓存未命中，查 DB
 	if err != nil {
@@ -248,6 +257,8 @@ func (h *Handler) handleGetVideo(w http.ResponseWriter, r *http.Request) {
 			// a. 查 DB
 			dbVideo, err := h.store.GetVideoByID(ctx, id)
 			if err != nil {
+				// 数据库也未命中，写入空值缓存
+				_ = h.cache.CacheNullVideoByID(context.Background(), id)
 				return nil, err
 			}
 
@@ -256,7 +267,6 @@ func (h *Handler) handleGetVideo(w http.ResponseWriter, r *http.Request) {
 			h.cache.CacheVideoByID(context.Background(), dbVideo)
 
 			return dbVideo, nil
-			// ----------------------------------------------------
 		})
 		if err != nil {
 			utils.WriteError(w, http.StatusNotFound, fmt.Errorf("video not found"))
@@ -266,6 +276,8 @@ func (h *Handler) handleGetVideo(w http.ResponseWriter, r *http.Request) {
 		// 类型断言：interface{} -> *types.Video
 		video = v.(*types.Video)
 	}
+
+PERMISSION_CHECK:
 
 	// 4. 权限检查
 	userID := auth.GetUserIDFromContext(r.Context())

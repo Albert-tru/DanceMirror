@@ -59,10 +59,20 @@
 
             console.log("⚙️ 初始化 AI 模型...");
             if(typeof showMessage === "function") showMessage("⏳ 正在初始化 AI 模型...", "info", 5000);
-            const options = { modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 };
             
+            //2.1 加载MediaPipe Pose模型
             this.teachPose = new window.Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
+            
+            //2.2 设置模型参数
+            const options = { 
+                modelComplexity: 1,             //模型复杂度，0-2，数值越大精度越高但性能要求更高
+                smoothLandmarks: true,          //平滑关键点
+                minDetectionConfidence: 0.5,    //最小检测置信度，0-1，数值越大要求越高但可能漏检
+                minTrackingConfidence: 0.5      //最小跟踪置信度，0-1，数值越大要求越高但可能丢失跟踪
+            };
             this.teachPose.setOptions(options);
+
+            //2.3 绑定结果回调，保存关键点并绘制骨架
             this.teachPose.onResults(results => {
                 this.lastTeachLandmarks = results.poseLandmarks;
                 const isSingle = document.body.classList.contains('mode-single');
@@ -70,12 +80,13 @@
                 this.draw(results, canvasId);
             });
 
+            //2.4 用户骨架+评分
             this.userPose = new window.Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
             this.userPose.setOptions(options);
             this.userPose.onResults(results => {
                 this.lastUserLandmarks = results.poseLandmarks;
-                this.draw(results, 'userSkeletonCanvas');
-                this.computeScore();
+                this.draw(results, 'userSkeletonCanvas');      //绘制用户骨架
+                this.computeScore();        //触发评分
             });
         },
 
@@ -114,30 +125,40 @@
             const userVideo = document.getElementById('userVideo');
 
             try {
+                //单视频模式分析教学视频
                 if (teachVideo && !teachVideo.paused && teachVideo.readyState >= 2) {
-                    await this.teachPose.send({ image: teachVideo });
+                    await this.teachPose.send({ image: teachVideo });   
+                    //         ↓
+                    // MediaPipe 输出 33 个关键点 (x, y, z, visibility)
                 }
+                //对比模式分析用户视频
                 if (!isSingle && userVideo && !userVideo.paused && userVideo.readyState >= 2) {
                     await this.userPose.send({ image: userVideo });
                 }
             } catch (e) {}
             
+            // 循环调用自己，保持实时分析
             if (this.isEnabled) requestAnimationFrame(this.loop.bind(this));
         },
 
+        //计算相似度并更新评分显示
         computeScore() {
             if (!this.lastUserLandmarks || !this.lastTeachLandmarks) return;
             
+            // 获取骨架向量
             const vLeft = getLimbVectors(this.lastTeachLandmarks);
             const vRight = getLimbVectors(this.lastUserLandmarks);
             
+            // 计算余弦相似度并转换为0-100分
             const sim = cosineSimilarity(vLeft, vRight);
             const score = Math.round(Math.max(0, sim * 100));
             
+            // 更新评分显示
             const scoreEl = document.getElementById('liveScore');
             const commentEl = document.getElementById('scoreComment');
             const board = document.getElementById('aiScoreBoard');
 
+            // 根据分数设置评论和颜色
             if (scoreEl) scoreEl.innerText = score;
             if (commentEl) {
                 let text = "加油", color = "#ef4444";
@@ -152,10 +173,12 @@
             }
         },
 
+        // 绘制骨架
         draw(results, canvasId) {
             const canvas = document.getElementById(canvasId);
             if (!canvas) return;
             const ctx = canvas.getContext('2d');
+
             if (canvas.width !== canvas.offsetWidth || canvas.height !== canvas.offsetHeight) {
                 canvas.width = canvas.offsetWidth;
                 canvas.height = canvas.offsetHeight;
@@ -163,7 +186,9 @@
             ctx.save();
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             if (results.poseLandmarks && window.drawConnectors) {
+                //绘制骨架连线（绿色）
                 window.drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS, { color: '#00FF00', lineWidth: 2 });
+                //绘制关键点（红色）
                 window.drawLandmarks(ctx, results.poseLandmarks, { color: '#FF0000', lineWidth: 1, radius: 3 });
             }
             ctx.restore();
@@ -176,6 +201,8 @@
     };
 
     window.AIContext = AIContext;
+
+    // 3. 绑定开关事件
     function bind() {
         const toggle = document.getElementById('aiToggle');
         if (toggle) {
