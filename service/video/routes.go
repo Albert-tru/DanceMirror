@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -36,6 +37,7 @@ type Handler struct {
 	esClient       *search.ESClient
 	sf             singleflight.Group
 	limiter        *ratelimit.Limiter
+	cacheBypass    bool // 是否绕过缓存，主要用于调试
 }
 
 func NewHandler(
@@ -57,6 +59,7 @@ func NewHandler(
 		esClient:       esClient,
 		sf:             singleflight.Group{},
 		limiter:        ratelimit.NewLimiter(),
+		cacheBypass:    os.Getenv("CACHE_BYPASS") == "1", // 通过环境变量控制是否绕过缓存
 	}
 }
 
@@ -238,77 +241,68 @@ func getVideoKey(v *types.Video) string {
 	return v.StoragePath
 }
 
-// 修改：详情页 Cache-Aside
+// 修改：详情页 Cache-Aside + 开关
 func (h *Handler) handleGetVideo(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, _ := strconv.Atoi(vars["id"])
 	ctx := r.Context()
 
-	// 1. 尝试从缓存获取 (利用 redis.go 中封装好的 GetVideoByID)
-	// GetVideoByID 内部调用了 r.Get(ctx, key, &video)
-	video, err := h.cache.GetVideoByID(ctx, id)
-	if err == nil {
-		goto PERMISSION_CHECK
-	}
-	if errors.Is(err, cache.ErrCacheNull) {
-		// 空值缓存命中，直接返回 404
-		utils.WriteError(w, http.StatusNotFound, fmt.Errorf("video not found"))
-		return
-	}
+	var (
+		video *types.Video
+		err   error
+	)
 
-	// 2. 缓存未命中，查 DB
-	if err != nil {
-		// 构造一个针对该 VideoID 的唯一 Key
-		sfKey := fmt.Sprintf("sf_video_%d", id)
-
-		// ✅ Do 方法保证：同一时刻，对同一个 sfKey，fn 函数只会执行一次
-		// 其他并发请求会阻塞在这里等待结果
-		// 修复：groupcache/singleflight 只返回 v 和 err，不返回 shared
-		v, err := h.sf.Do(sfKey, func() (interface{}, error) {
-			// --- 这里是真正查 DB 的逻辑 (只会有 1 个请求进来) ---
-
-			// a. 查 DB
-			dbVideo, err := h.store.GetVideoByID(ctx, id)
-			if err != nil {
-				// 数据库也未命中，写入空值缓存
-				_ = h.cache.CacheNullVideoByID(context.Background(), id)
-				return nil, err
-			}
-
-			// b. 回写缓存 (Cache-Aside)
-			// 使用 context.Background() 确保请求取消不影响回写缓存
-			h.cache.CacheVideoByID(context.Background(), dbVideo)
-
-			return dbVideo, nil
-		})
+	// A组：绕过缓存（优化前）
+	if h.cacheBypass {
+		video, err = h.store.GetVideoByID(ctx, id)
 		if err != nil {
 			utils.WriteError(w, http.StatusNotFound, fmt.Errorf("video not found"))
 			return
 		}
+	} else {
+		// B组：正常缓存逻辑（优化后）
+		video, err = h.cache.GetVideoByID(ctx, id)
+		if err != nil {
+			if errors.Is(err, cache.ErrCacheNull) {
+				utils.WriteError(w, http.StatusNotFound, fmt.Errorf("video not found"))
+				return
+			}
 
-		// 类型断言：interface{} -> *types.Video
-		video = v.(*types.Video)
+			sfKey := fmt.Sprintf("sf_video_%d", id)
+			var v interface{}
+			v, err = h.sf.Do(sfKey, func() (interface{}, error) {
+				dbVideo, dbErr := h.store.GetVideoByID(ctx, id)
+				if dbErr != nil {
+					_ = h.cache.CacheNullVideoByID(context.Background(), id)
+					return nil, dbErr
+				}
+				_ = h.cache.CacheVideoByID(context.Background(), dbVideo)
+				return dbVideo, nil
+			})
+			if err != nil {
+				utils.WriteError(w, http.StatusNotFound, fmt.Errorf("video not found"))
+				return
+			}
+
+			var ok bool
+			video, ok = v.(*types.Video)
+			if !ok || video == nil {
+				utils.WriteError(w, http.StatusInternalServerError, fmt.Errorf("invalid video data"))
+				return
+			}
+		}
 	}
 
-PERMISSION_CHECK:
-
-	// 4. 权限检查
 	userID := auth.GetUserIDFromContext(r.Context())
 	if video.UserID != userID {
 		utils.WriteError(w, http.StatusForbidden, fmt.Errorf("permission denied"))
 		return
 	}
 
-	// 5. 生成签名 URL
 	key := getVideoKey(video)
-	if key == "" {
-		key = video.StoragePath
-	}
-
 	if key != "" {
 		video.FilePath = h.fileURL(ctx, key)
 	}
-
 	utils.WriteJSON(w, http.StatusOK, video)
 }
 

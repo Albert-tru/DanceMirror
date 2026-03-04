@@ -1,0 +1,11 @@
+group=B_after
+cache_bypass=0
+db_before=5789030
+db_after=9272390
+db_delta=3483360
+redis_hit_before=3236639
+redis_hit_after=6451441
+redis_hit_delta=3214802
+redis_miss_before=131675
+redis_miss_after=265972
+redis_miss_delta=134297

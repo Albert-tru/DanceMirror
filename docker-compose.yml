@@ -33,6 +33,7 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT=jaeger:4318
       - OTEL_EXPORTER_OTLP_INSECURE=true
       - PUBLIC_HOST=localhost
+      - CACHE_BYPASS=${CACHE_BYPASS:-0}
     volumes:
       # 挂载 uploads 目录到宿主机（持久化上传文件）
       - ./uploads:/app/uploads
