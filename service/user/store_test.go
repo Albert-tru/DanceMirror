@@ -251,6 +251,7 @@ func TestUserStore_Integration(t *testing.T) {
 		db.Exec("DELETE FROM users")
 
 		// 使用 goroutine 并发创建用户
+		//使用匿名函数和闭包传递索引i，确保每个goroutine创建的用户信息（index）不同
 		done := make(chan bool, 10)
 		for i := 0; i < 10; i++ {
 			go func(index int) {
@@ -262,7 +263,7 @@ func TestUserStore_Integration(t *testing.T) {
 					Password:  "pass",
 				}
 				store.CreateUser(user)
-				done <- true
+				done <- true // 通知主 goroutine 这个子 goroutine 已完成
 			}(i)
 		}
 
