@@ -1,6 +1,10 @@
 import http from "k6/http";
 import { check, sleep } from "k6";
+import { Counter } from "k6/metrics";
 import { API, ENDPOINTS, loginAndGetToken, authHeaders, getVideoIDs, pick } from "./shared.js";
+
+const analyzeSuccess = new Counter("analyze_success");
+const DEBUG = __ENV.DEBUG === "1";
 
 export const options = {
   scenarios: {
@@ -8,10 +12,12 @@ export const options = {
       executor: "ramping-vus",
       startVUs: 0,
       stages: [
-        { duration: "10s", target: 10 },
-        { duration: "30s", target: 30 },
-        { duration: "30s", target: 30 },
-        { duration: "10s", target: 0 },
+        { duration: "20s", target: 5 },
+        { duration: "20s", target: 10 },
+        { duration: "20s", target: 20 },
+        { duration: "20s", target: 30 },
+        { duration: "20s", target: 40 },
+        { duration: "20s", target: 0 },
       ],
     },
   },
@@ -24,21 +30,30 @@ export const options = {
 export function setup() {
   const token = loginAndGetToken();
   const headers = { ...authHeaders(token), "Content-Type": "application/json" };
-  const ids = getVideoIDs(authHeaders(token), 200);
+  const ids = getVideoIDs(authHeaders(token), 500); // 获取 500 个视频 ID
   return { headers, ids };
 }
 
 export default function (data) {
   if (!data.ids.length) return;
 
+  // 随机选择一个视频 ID
   const id = pick(data.ids);
+
   const res = http.post(
     `${API}${ENDPOINTS.analyze(id)}`,
     JSON.stringify({}),
     { headers: data.headers }
   );
 
-  // 常见: 200/202；若限流可能 429
+  if (DEBUG) {
+    console.log(`analyze id=${id}, status=${res.status}, body=${res.body}`);
+  }
+
+  if ([200, 202].includes(res.status)) {
+    analyzeSuccess.add(1); // 统计成功的分析请求
+  }
+
   check(res, {
     "analyze accepted": (r) => [200, 202, 429].includes(r.status),
   });

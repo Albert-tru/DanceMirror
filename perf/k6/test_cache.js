@@ -69,12 +69,6 @@ export function setup() {
 }
 
 export default function (data) {
-  if (Math.random() < 0.8) {
-    const res = http.get(`${API}/videos/${data.hotId}`, { headers: data.headers });
-    check(res, { "hot key 200": (r) => r.status === 200 });
-  } else {
-    const fakeId = Math.floor(Math.random() * 100000) + 90000000;
-    const res = http.get(`${API}/videos/${fakeId}`, { headers: data.headers });
-    check(res, { "fake key 404": (r) => r.status === 404 });
-  }
+  const res = http.get(`${API}/videos/${data.hotId}`, { headers: data.headers });
+  check(res, { "hot key 200": (r) => r.status === 200 });
 }

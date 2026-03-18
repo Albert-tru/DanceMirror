@@ -3,7 +3,7 @@ import { check, sleep } from "k6";
 import { API, ENDPOINTS, loginAndGetToken, authHeaders } from "./shared.js";
 
 // k6: open() 必须在 init context
-const filePath = __ENV.SAMPLE_FILE || "./perf/k6/assets/sample.mp4";
+const filePath = __ENV.SAMPLE_FILE || "/home/dmin/go/DanceMirror/perf/k6/assets/simple.mp4";
 const bin = open(filePath, "b");
 
 export const options = {
@@ -35,7 +35,7 @@ export default function (data) {
     title: `k6_upload_${Date.now()}`,
     description: "k6 upload test",
     tags: "k6,perf",
-    file: http.file(bin, "sample.mp4", "video/mp4"),
+    file: http.file(bin, "simple.mp4", "video/mp4"),
   };
 
   const res = http.post(`${API}${ENDPOINTS.upload}`, payload, {

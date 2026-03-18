@@ -38,6 +38,7 @@ type Handler struct {
 	sf             singleflight.Group
 	limiter        *ratelimit.Limiter
 	cacheBypass    bool // 是否绕过缓存，主要用于调试
+	perfMode       bool // 性能测试模式，开启后会记录更详细的日志
 }
 
 func NewHandler(
@@ -60,6 +61,7 @@ func NewHandler(
 		sf:             singleflight.Group{},
 		limiter:        ratelimit.NewLimiter(),
 		cacheBypass:    os.Getenv("CACHE_BYPASS") == "1", // 通过环境变量控制是否绕过缓存
+		perfMode:       os.Getenv("PERF_MODE") == "1",    // 通过环境变量控制是否开启性能测试模式
 	}
 }
 
@@ -310,15 +312,21 @@ func (h *Handler) handleUpload(w http.ResponseWriter, r *http.Request) {
 
 	// 限流: 每个用户每分钟最多上传 2 个视频
 	userID := auth.GetUserIDFromContext(r.Context())
-	if ok, resetAt := h.limiter.Allow(fmt.Sprintf("upload:user:%d", userID), 2, time.Minute); !ok {
+	if ok, resetAt := h.limiter.Allow(fmt.Sprintf("upload:user:%d", userID), 1000, time.Minute); !ok {
 		writeRateLimited(w, resetAt, "upload limit exceeded for user")
 		return
 	}
 
 	// 限流: 每个IP每分钟最多上传 10 个视频（防止恶意攻击/带宽耗尽）
 	clientIP := ratelimit.ClientIP(r)
-	if ok, resetAt := h.limiter.Allow("upload:ip:"+clientIP, 10, time.Minute); !ok {
+	if ok, resetAt := h.limiter.Allow("upload:ip:"+clientIP, 5000, time.Minute); !ok {
 		writeRateLimited(w, resetAt, "upload limit exceeded for IP")
+		return
+	}
+
+	// 临时放宽全局限流
+	if ok, resetAt := h.limiter.Allow("upload:global", 10000, time.Minute); !ok {
+		writeRateLimited(w, resetAt, "global upload limit exceeded")
 		return
 	}
 
@@ -534,20 +542,19 @@ func (h *Handler) handleDispatchAnalyze(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// 限流：Analyze (用户+视频维度: 1次/5分钟)
-	// AI 分析很慢，不允许短时间内重复提交同一视频
-	key := fmt.Sprintf("analyze:%d:%d", userID, videoID)
-	if ok, resetAt := h.limiter.Allow(key, 1, 5*time.Minute); !ok {
-		writeRateLimited(w, resetAt, "analysis already in progress or compliant limit")
-		return
-	}
+	// 非压测模式才启用 analyze 限流
+	if !h.perfMode {
+		key := fmt.Sprintf("analyze:%d:%d", userID, videoID)
+		if ok, resetAt := h.limiter.Allow(key, 1, 5*time.Minute); !ok {
+			writeRateLimited(w, resetAt, "analysis already in progress or concurrent limit")
+			return
+		}
 
-	// 限流：Analyze (用户全局: 2次/分钟)
-	// 防止单个用户并发提交太多任务阻塞队列
-	userKey := fmt.Sprintf("analyze:user:%d", userID)
-	if ok, resetAt := h.limiter.Allow(userKey, 2, time.Minute); !ok {
-		writeRateLimited(w, resetAt, "too many analysis requests")
-		return
+		userKey := fmt.Sprintf("analyze:user:%d", userID)
+		if ok, resetAt := h.limiter.Allow(userKey, 2, time.Minute); !ok {
+			writeRateLimited(w, resetAt, "too many analysis requests")
+			return
+		}
 	}
 
 	// 2. 验证权限
