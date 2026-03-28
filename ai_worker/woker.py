@@ -8,6 +8,7 @@ import redis
 import requests
 import os
 import time
+import random
 import google.generativeai as genai  # ✅ 新增引入
 
 # 配置 (最好从环境变量读)
@@ -41,47 +42,54 @@ def calculate_angle(a, b, c):
 def ask_ai_coach(score, error_log):
     """
     调用 Google Gemini API 生成个性化点评
-    
-    参数：
-    - score: 评分 (60-100)
-    - error_log: 错误统计 {"arm_too_low": 5, "timing_off": 2}
+    error_log 示例：
+    {
+      "right_arm_low": 12,
+      "left_arm_low": 8,
+      "torso_tilt": 6,
+      "rhythm_off": 4
+    }
     """
+    error_labels = {
+        "right_arm_low": "右臂抬高不够",
+        "left_arm_low": "左臂抬高不够",
+        "torso_tilt": "身体中轴不稳",
+        "rhythm_off": "节奏不够稳定"
+    }
+
+    ranked = sorted(
+        [(k, v) for k, v in error_log.items() if v > 0],
+        key=lambda x: x[1],
+        reverse=True
+    )
 
     if not GEMINI_API_KEY:
-        # ✅ 没有 API Key 时返回默认文案，不要返回 None！
-        errors = []
-        for key, count in error_log.items():
-            if key == 'arm_too_low' and count > 3:
-                errors.append(f"右臂抬高不够，出现{count}次")
-            elif key == 'timing_off' and count > 2:
-                errors.append(f"节奏有点跑偏，出现{count}次")
-        
-        if errors:
-            return f"分数 {score} 分。注意：{'；'.join(errors)}。继续加油！💪"
+        if ranked:
+            top = ranked[0]
+            top_label = error_labels.get(top[0], top[0])
+            return f"分数 {score} 分。主要问题是{top_label}（{top[1]}次），先把这一点练稳，进步会很快。💪"
         elif score >= 85:
             return f"太棒了！分数 {score} 分，动作非常标准！🔥"
         elif score >= 70:
             return f"不错！分数 {score} 分，继续保持！👍"
         else:
-            return f"分数 {score} 分，多练习就会越来越好！💃"
+            return f"分数 {score} 分，动作基础在了，再把幅度做开一点会更好！💃"
 
     try:
-        # 构建 Prompt
+        top_text = "、".join([f"{error_labels.get(k, k)}({v}次)" for k, v in ranked[:3]]) if ranked else "未发现明显错误"
         prompt = f"""
-        你是一位专业的街舞教练。
-        我刚刚跳了一段舞，机器评分是 {score}/100。
-        主要检测到的问题列表：{str(error_log)}
-        
-        请你生成一段简短的点评（100字以内）：
-        1. 语气要像真人口语，有时严厉有时鼓励，带一点街舞圈的黑话（比如 vibe, swish, power）。
-        2. 先根据分数给个整体评价。
-        3. 针对那个出现最多次的问题给一个具体的修改建议。
-        4. 不要使用 markdown 格式。
-        """
-        
+你是一位专业街舞教练。
+本次评分：{score}/100
+主要问题：{top_text}
+
+请输出100字以内中文点评，要求：
+1) 口语化，有鼓励，也有明确改进点
+2) 优先给出现次数最多问题的纠正建议
+3) 不要使用 markdown
+"""
         model = genai.GenerativeModel('gemini-1.5-flash')
         response = model.generate_content(prompt)
-        return response.text.strip()
+        return (response.text or "").strip() or f"分数 {score} 分，继续加油！"
     except Exception as e:
         print(f"❌ LLM 调用失败: {e}")
         return f"AI 教练正忙，但他看到你得了 {score} 分，继续加油！"
@@ -102,108 +110,174 @@ def analyze_video(video_url, task_id):
     7. 调用 LLM 生成点评
     """
 
+    """
+    离线分析：多维度建议 + 去重节流 + 更丰富文案
+    """
     print(f"📥 下载视频: {video_url}")
-    
-    # 下载视频流
     cap = cv2.VideoCapture(video_url)
-    
+
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    if not fps or fps <= 1:
+        fps = 30.0
+
     suggestions = []
     frame_count = 0
-    total_score = 0
+    total_score = 0.0
     valid_frames = 0
-    
-    # 记录具体的错误类型 tally
+
     error_stats = {
-        "arm_too_low": 0,
-        "timing_off": 0
+        "right_arm_low": 0,
+        "left_arm_low": 0,
+        "torso_tilt": 0,
+        "rhythm_off": 0,
     }
 
-    # 无论如何都加一条弹幕建议
+    message_pool = {
+        "right_arm_low": [
+            "右手再抬高一点，动作会更有力量感！",
+            "右臂幅度偏小，肩线再打开一点。",
+            "右侧上肢不够到位，试试把肘部再提起来。",
+            "右手位偏低，想象在推开上方空气。",
+            "右臂线条还可以更舒展，再上提一点点。"
+        ],
+        "left_arm_low": [
+            "左手再抬高一点，左右会更平衡！",
+            "左臂幅度偏小，注意和右侧保持一致。",
+            "左手位稍低，建议抬到肩线以上。",
+            "左侧发力有点保守，动作再放开一点。",
+            "左臂再展开，你的整体气场会更好。"
+        ],
+        "torso_tilt": [
+            "身体中轴有点歪，核心再收紧。",
+            "上身稳定性稍弱，注意骨盆和肩膀对齐。",
+            "躯干有明显侧倾，先把重心稳住。",
+            "核心控制再加强，动作会更干净。",
+            "身体线条有点跑偏，注意立住中轴。"
+        ],
+        "rhythm_off": [
+            "节奏有点赶，试着跟拍点慢半拍校准。",
+            "卡点不够稳，先稳住节拍再提速。",
+            "动作切换偏急，节奏感再放松一点。",
+            "拍点有些漂，建议先做分段练习。",
+            "节奏起伏偏大，先把基础拍踩实。"
+        ]
+    }
+
+    last_emit_sec = {
+        "right_arm_low": -99.0,
+        "left_arm_low": -99.0,
+        "torso_tilt": -99.0,
+        "rhythm_off": -99.0
+    }
+
+    prev_right_angle = None
+    prev_left_angle = None
+
+    def maybe_emit(err_type, now_sec, extra_text=None):
+        cooldown_sec = 3.0
+        if now_sec - last_emit_sec[err_type] < cooldown_sec:
+            return
+        text = random.choice(message_pool[err_type])
+        if extra_text:
+            text = f"{text}（{extra_text}）"
+        suggestions.append(f"{now_sec:.1f}秒: {text}")
+        last_emit_sec[err_type] = now_sec
+
     suggestions.append("1.0秒: AI 教练已开始为你分析动作，请注意动作幅度！")
 
-    
     while cap.isOpened():
         ret, frame = cap.read()
-        if not ret: break
-        
+        if not ret:
+            break
+
         frame_count += 1
-        # 每 10 帧分析一次，节省 CPU
-        if frame_count % 10 != 0: continue
-            
+        if frame_count % 10 != 0:
+            continue
+
+        now_sec = frame_count / fps
         image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         results = pose.process(image)
-        
-        if results.pose_landmarks:
-            valid_frames += 1
-            landmarks = results.pose_landmarks.landmark
-            
-            # --- 核心算法逻辑：检测“举手”动作 ---
-            # 获取右侧：肩(12), 肘(14), 腕(16)
-            r_shoulder = [landmarks[12].x, landmarks[12].y]
-            r_elbow = [landmarks[14].x, landmarks[14].y]
-            r_wrist = [landmarks[16].x, landmarks[16].y]
-            
-            # 计算腋下角度 (躯干-肩-肘) 近似算法
-            # 这里简化为计算 肘-肩-髋 的角度来判断是否抬起
-            r_hip = [landmarks[24].x, landmarks[24].y]
-            armpit_angle = calculate_angle(r_elbow, r_shoulder, r_hip)
-            
-            # 规则：如果你在做“扩胸”或“举手”，角度应该 > 80度
-            # 这里的规则可以写得很复杂，为了演示简单点：
-            if armpit_angle < 45:
-                # 限制弹幕密度：每2秒（约60帧）最多发一条同样的
-                if frame_count % 60 == 0:
-                    suggestions.append(f"{frame_count/30:.1f}秒: 右胳膊抬得不够高哦！({int(armpit_angle)}°)")
-                error_stats["arm_too_low"] += 1
-            else:
-                total_score += 1 # 简单的加分逻辑
-                
-    cap.release()
-    
 
-    # 计算最终得分 (0-100)
-    final_score = int((total_score / valid_frames) * 100) if valid_frames > 0 else 0
-    final_score = min(100, max(60, final_score)) # 修正到 60-100 区间鼓励用户
-    
-    # 调用 AI Agent 生成最终点评
+        if not results.pose_landmarks:
+            continue
+
+        valid_frames += 1
+        landmarks = results.pose_landmarks.landmark
+
+        r_shoulder = [landmarks[12].x, landmarks[12].y]
+        r_elbow = [landmarks[14].x, landmarks[14].y]
+        r_hip = [landmarks[24].x, landmarks[24].y]
+
+        l_shoulder = [landmarks[11].x, landmarks[11].y]
+        l_elbow = [landmarks[13].x, landmarks[13].y]
+        l_hip = [landmarks[23].x, landmarks[23].y]
+
+        right_arm_angle = calculate_angle(r_elbow, r_shoulder, r_hip)
+        left_arm_angle = calculate_angle(l_elbow, l_shoulder, l_hip)
+
+        # 躯干侧倾角（越大越歪）
+        mid_shoulder = [(l_shoulder[0] + r_shoulder[0]) / 2, (l_shoulder[1] + r_shoulder[1]) / 2]
+        mid_hip = [(l_hip[0] + r_hip[0]) / 2, (l_hip[1] + r_hip[1]) / 2]
+        dx = abs(mid_shoulder[0] - mid_hip[0])
+        dy = abs(mid_shoulder[1] - mid_hip[1]) + 1e-6
+        torso_tilt_deg = abs(np.degrees(np.arctan2(dx, dy)))
+
+        frame_score = 0.0
+
+        if right_arm_angle < 45:
+            error_stats["right_arm_low"] += 1
+            maybe_emit("right_arm_low", now_sec, f"右臂角度{int(right_arm_angle)}°")
+        else:
+            frame_score += 1.0
+
+        if left_arm_angle < 45:
+            error_stats["left_arm_low"] += 1
+            maybe_emit("left_arm_low", now_sec, f"左臂角度{int(left_arm_angle)}°")
+        else:
+            frame_score += 1.0
+
+        if torso_tilt_deg > 18:
+            error_stats["torso_tilt"] += 1
+            maybe_emit("torso_tilt", now_sec, f"侧倾{int(torso_tilt_deg)}°")
+        else:
+            frame_score += 1.0
+
+        if prev_right_angle is not None and prev_left_angle is not None:
+            right_jump = abs(right_arm_angle - prev_right_angle)
+            left_jump = abs(left_arm_angle - prev_left_angle)
+            if right_jump > 35 or left_jump > 35:
+                error_stats["rhythm_off"] += 1
+                maybe_emit("rhythm_off", now_sec)
+
+        prev_right_angle = right_arm_angle
+        prev_left_angle = left_arm_angle
+
+        total_score += frame_score / 3.0
+
+    cap.release()
+
+    final_score = int((total_score / valid_frames) * 100) if valid_frames > 0 else 60
+    final_score = min(100, max(60, final_score))
+
     print("🤖 正在请求 AI 教练生成点评...")
     ai_comment = ask_ai_coach(final_score, error_stats)
-    
-    # 将 AI 点评作为第 0 秒的弹幕，或者放在前端特定的显示的区域
-    # 这里我们把它加进 suggestions 列表的最前面，用特殊前缀标识
+
+    if len(suggestions) <= 1:
+        suggestions.append("2.0秒: 动作整体不错，继续保持当前节奏！")
+
     suggestions.insert(0, f"0.5秒: 【AI总评】{ai_comment}")
 
-    # 结果打包
-    print(f"DEBUG suggestions count: {len(suggestions)}")
     result = {
         "score": final_score,
-        "suggestions": suggestions,  
-        "ai_summary": ai_comment, # 单独存一个字段方便前端读取
+        "suggestions": suggestions,
+        "ai_summary": ai_comment,
         "status": "finished",
-        "create_time": time.time()
+        "create_time": time.time(),
+        "error_stats": error_stats
     }
-    
+    print(f"DEBUG suggestions count: {len(suggestions)}")
     return result
-
-def callback(ch, method, properties, body):
-    task = json.loads(body)
-    print(f"🚀 收到任务: Video {task['video_id']}")
     
-    try:
-        # 1. 运行 AI 分析
-        report = analyze_video(task['input_path'], task['video_id'])
-        
-        # 2. 存入 Redis (过期时间 24小时)
-        redis_key = f"analysis:video:{task['video_id']}"
-        r_cache.set(redis_key, json.dumps(report), ex=86400)
-        print(f"✅ 分析完成，结果已存入 Redis: {redis_key}")
-        ch.basic_ack(delivery_tag=method.delivery_tag)  # ✅ 成功才 ACK
-        
-    except Exception as e:
-        print(f"❌ 分析失败: {e}")
-        # ✅ 失败时 nack，requeue=False 让消息进入死信队列
-        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)        
-
 def start_worker():
     print("🔧 Worker 启动中...")
     retry_count = 0

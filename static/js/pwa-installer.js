@@ -55,6 +55,34 @@ class PWAInstaller {
     this.deferredPrompt = null;
     this.hideInstallBanner();
   }
+
+  async getServiceWorkerVersion() {
+  try {
+    const resp = await fetch('/static/service-worker.js', { cache: 'no-store' });
+    return (
+      resp.headers.get('etag') ||
+      resp.headers.get('last-modified') ||
+      'v1'
+    );
+  } catch {
+    return 'v1';
+  }
+}
+
+async registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+
+  try {
+    const version = await this.getServiceWorkerVersion();
+    const swUrl = `/static/service-worker.js?v=${encodeURIComponent(version)}`;
+
+    const registration = await navigator.serviceWorker.register(swUrl, { scope: '/' });
+    console.log('[PWA] Service Worker 注册成功:', registration.scope, 'version=', version);
+    registration.update();
+  } catch (error) {
+    console.error('[PWA] Service Worker 注册失败:', error);
+  }
+}
 }
 
 // 创建全局实例

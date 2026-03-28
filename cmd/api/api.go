@@ -10,16 +10,21 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/Albert-tru/DanceMirror/pkg/observability"
+	"github.com/Albert-tru/DanceMirror/service/admin"
+	"github.com/Albert-tru/DanceMirror/service/auth"
 	"github.com/Albert-tru/DanceMirror/service/cache"
 	"github.com/Albert-tru/DanceMirror/service/mq"
 	"github.com/Albert-tru/DanceMirror/service/search"
 	"github.com/Albert-tru/DanceMirror/service/storage"
 	"github.com/Albert-tru/DanceMirror/service/user"
 	"github.com/Albert-tru/DanceMirror/service/video"
+	"github.com/Albert-tru/DanceMirror/utils"
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"gorm.io/gorm"
@@ -42,28 +47,20 @@ func NewAPIServer(
 	mq *mq.RabbitMQClient,
 	es *search.ESClient,
 ) *APIServer {
-	return &APIServer{
-		addr:        addr,
-		db:          db,
-		redisClient: redisClient,
-		storage:     storage,
-		mq:          mq,
-		es:          es,
-	}
+	return &APIServer{addr: addr, db: db, redisClient: redisClient, storage: storage, mq: mq, es: es}
 }
 
 func (s *APIServer) Run() error {
 	router := mux.NewRouter()
 
-	// 全局中间件：Request ID、日志、体积限制等
 	router.Use(s.requestIDMiddleware)
 	router.Use(observability.ObservabilityMiddleware)
-	router.Use(limitBodyMiddleware(500 * 1024 * 1024)) // 500MB
-	router.Handle("/metrics", promhttp.Handler())      // Prometheus 指标路由
+	router.Use(s.errorLogMiddleware)
+	router.Use(limitBodyMiddleware(500 * 1024 * 1024))
+	router.Handle("/metrics", promhttp.Handler())
 
 	subrouter := router.PathPrefix("/api/v1").Subrouter()
 
-	// 健康检查路由
 	router.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
@@ -83,26 +80,16 @@ func (s *APIServer) Run() error {
 		_, _ = w.Write([]byte("ready"))
 	})
 
-	// uploads
-	router.PathPrefix("/uploads/").Handler(
-		http.StripPrefix("/uploads/", http.FileServer(http.Dir("./uploads"))))
-
-	// static (frontend)
+	router.PathPrefix("/uploads/").Handler(http.StripPrefix("/uploads/", http.FileServer(http.Dir("./uploads"))))
 	fs := http.FileServer(http.Dir("./static"))
-
-	// ✅ 修复：直接使用 FileServer，去除手动修改 Path 的闭包
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", fs))
-
-	// ✅ 新增：访问根目录 http://localhost:8080/ 时自动跳到首页
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/static/index.html", http.StatusFound)
 	})
 
-	// 初始化 Services
 	userStore := user.NewStore(s.db)
 	videoStore := video.NewStore(s.db, s.mq)
 
-	// ES 初始化（若未传入则尝试从环境创建）
 	if s.es == nil {
 		esAddr := os.Getenv("ES_ADDR")
 		if esAddr == "" {
@@ -119,44 +106,29 @@ func (s *APIServer) Run() error {
 		}
 	}
 
-	// User Handler
 	userHandler := user.NewHandler(userStore)
 	userHandler.RegisterRoutes(subrouter)
 
-	// 定义裁剪任务的生产者
 	publishCrop := func(task map[string]interface{}) error {
 		body, err := json.Marshal(task)
 		if err != nil {
 			return err
 		}
-		// 使用 main.go 中定义的队列名 "video_crop_queue"
 		return s.mq.Publish("video_crop_queue", body)
 	}
-
-	// 定义ai分析任务的生产者
-	// 这个匿名函数负责把任务塞进 RabbitMQ 的 "video_analyze_queue" 队列
 	publishAnalyze := func(task map[string]interface{}) error {
 		body, err := json.Marshal(task)
 		if err != nil {
 			return err
 		}
-		// 确保这里的队列名和 Python Worker 里监听的 queuedeclare 名字一致
 		return s.mq.Publish("video_analyze_queue", body)
 	}
 
 	videoHandler := video.NewHandler(videoStore, userStore, s.redisClient, s.storage, publishCrop, publishAnalyze, s.es)
 	videoHandler.RegisterRoutes(subrouter)
 
-	// Debug Routes
-	if err := router.Walk(func(route *mux.Route, r *mux.Router, ancestors []*mux.Route) error {
-		_, err := route.GetPathTemplate()
-		if err == nil {
-			// log.Println("route:", tpl)
-		}
-		return nil
-	}); err != nil {
-		log.Println("route walk err:", err)
-	}
+	adminHandler := admin.NewHandler(s.db, userStore)
+	adminHandler.RegisterRoutes(subrouter)
 
 	srv := &http.Server{
 		Addr:         s.addr,
@@ -166,10 +138,8 @@ func (s *APIServer) Run() error {
 		IdleTimeout:  120 * time.Second,
 	}
 
-	// 启动服务器
 	go func() {
 		log.Printf("🚀 Server is running on %s", s.addr)
-		// 打印 Redis/MQ 状态 (可选)
 		log.Printf("MQ Connected: %v", s.mq != nil)
 		log.Printf("ES Connected: %v", s.es != nil)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -177,7 +147,6 @@ func (s *APIServer) Run() error {
 		}
 	}()
 
-	// 优雅关闭
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
@@ -185,7 +154,6 @@ func (s *APIServer) Run() error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Fatalf("Server forced to shutdown: %v", err)
 	}
@@ -193,7 +161,6 @@ func (s *APIServer) Run() error {
 	return nil
 }
 
-// requestIDMiddleware injects X-Request-Id if absent
 func (s *APIServer) requestIDMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := r.Header.Get("X-Request-Id")
@@ -213,7 +180,126 @@ func (s *APIServer) requestIDMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// loggingMiddleware logs basic request info
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (r *statusRecorder) WriteHeader(statusCode int) {
+	r.status = statusCode
+	r.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (r *statusRecorder) Write(b []byte) (int, error) {
+	if r.status == 0 {
+		r.status = http.StatusOK
+	}
+	return r.ResponseWriter.Write(b)
+}
+
+func (s *APIServer) errorLogMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		recorder := &statusRecorder{ResponseWriter: w}
+		next.ServeHTTP(recorder, r)
+		if recorder.status == 0 {
+			recorder.status = http.StatusOK
+		}
+		if s.db == nil {
+			return
+		}
+
+		requestID := utils.GetRequestIDFromContext(r.Context())
+		userID := auth.GetUserIDFromContext(r.Context())
+		if userID <= 0 {
+			userID = auth.GetUserIDFromRequest(r)
+		}
+		var userIDValue interface{}
+		if userID > 0 {
+			userIDValue = userID
+		}
+
+		var videoIDValue interface{}
+		videoID := 0
+		if vars := mux.Vars(r); vars != nil {
+			if rawVideoID, ok := vars["id"]; ok {
+				if parsed, err := strconv.Atoi(rawVideoID); err == nil {
+					videoID = parsed
+					videoIDValue = parsed
+				}
+			}
+		}
+		if videoID == 0 {
+			parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+			for idx := 0; idx < len(parts)-1; idx++ {
+				if parts[idx] == "videos" {
+					if parsed, err := strconv.Atoi(parts[idx+1]); err == nil {
+						videoID = parsed
+						videoIDValue = parsed
+					}
+					break
+				}
+			}
+		}
+
+		if r.Method == http.MethodPost && r.URL.Path == "/api/v1/videos" && userID > 0 {
+			status := "success"
+			errorCode := ""
+			if recorder.status >= 400 {
+				status = "failed"
+				errorCode = fmt.Sprintf("HTTP_%d", recorder.status)
+			}
+			_ = s.db.Exec(`
+INSERT INTO upload_events (userId, videoId, status, fileSize, errorCode, requestId)
+VALUES (?, NULL, ?, 0, ?, ?)
+`, userID, status, errorCode, requestID).Error
+		}
+
+		if r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/crop") && userID > 0 && videoID > 0 {
+			errorCode := ""
+			if recorder.status >= 400 {
+				errorCode = fmt.Sprintf("HTTP_%d", recorder.status)
+			}
+			_ = s.db.Exec(`
+INSERT INTO upload_events (userId, videoId, status, fileSize, errorCode, requestId)
+VALUES (?, ?, 'crop_requested', 0, ?, ?)
+`, userID, videoID, errorCode, requestID).Error
+		}
+
+		if r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/analyze") && userID > 0 && videoID > 0 {
+			status := "queued"
+			reason := ""
+			if recorder.status >= 400 {
+				status = "failed"
+				reason = fmt.Sprintf("HTTP_%d", recorder.status)
+			}
+			_ = s.db.Exec(`
+INSERT INTO ai_tasks (userId, videoId, status, errorReason, requestId)
+VALUES (?, ?, ?, ?, ?)
+`, userID, videoID, status, reason, requestID).Error
+		}
+		if r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/analysis") && recorder.status == http.StatusOK && userID > 0 && videoID > 0 {
+			_ = s.db.Exec(`
+UPDATE ai_tasks
+SET status='success', errorReason=NULL, durationMs=TIMESTAMPDIFF(MICROSECOND, createdAt, NOW())/1000
+WHERE userId=? AND videoId=?
+ORDER BY id DESC
+LIMIT 1
+`, userID, videoID).Error
+		}
+
+		if recorder.status < 400 {
+			return
+		}
+
+		errorCode := fmt.Sprintf("HTTP_%d", recorder.status)
+		message := http.StatusText(recorder.status)
+		_ = s.db.Exec(`
+INSERT INTO api_error_logs (requestId, userId, videoId, method, path, statusCode, errorCode, message)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+`, requestID, userIDValue, videoIDValue, r.Method, r.URL.Path, recorder.status, errorCode, message).Error
+	})
+}
+
 func (s *APIServer) loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -227,7 +313,6 @@ func (s *APIServer) loggingMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// limitBodyMiddleware limits request body size
 func limitBodyMiddleware(maxBytes int64) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

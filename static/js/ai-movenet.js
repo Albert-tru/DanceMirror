@@ -57,6 +57,66 @@
             }
         },
 
+        pushRealtimeSuggestion(score, userKeypoints) {
+    if (!window.DanmakuManager || !Array.isArray(userKeypoints)) return;
+
+    const now = Date.now();
+    this._lastRealtimeTs = this._lastRealtimeTs || 0;
+    this._lastRealtimeType = this._lastRealtimeType || '';
+
+    // 1.8s 冷却，防止刷屏
+    if (now - this._lastRealtimeTs < 1800) return;
+
+    const kp = userKeypoints;
+    const ls = kp[5], rs = kp[6], lw = kp[9], rw = kp[10];
+    if (!ls || !rs || !lw || !rw) return;
+    if ((ls.score ?? 1) < 0.3 || (rs.score ?? 1) < 0.3 || (lw.score ?? 1) < 0.3 || (rw.score ?? 1) < 0.3) return;
+
+    let type = 'pace';
+    let text = '节奏稳住，继续保持 👏';
+
+    // 手腕低于肩太多
+    const rightLow = (rw.y - rs.y) > 0.08;
+    const leftLow  = (lw.y - ls.y) > 0.08;
+    const shoulderTilt = Math.abs(ls.y - rs.y);
+
+    if (rightLow && leftLow) {
+        type = 'arms_both_low';
+        text = '双臂再抬高一点，动作会更打开 💪';
+    } else if (rightLow) {
+        type = 'right_arm_low';
+        text = '右臂偏低，右手再提一点 ↗';
+    } else if (leftLow) {
+        type = 'left_arm_low';
+        text = '左臂偏低，左手再提一点 ↖';
+    } else if (shoulderTilt > 0.06) {
+        type = 'torso_tilt';
+        text = '身体有点歪，核心收紧站稳';
+    } else if (score > 85) {
+        type = 'good';
+        text = '这一段很稳！继续保持 🔥';
+    }
+
+    // 避免连续重复同类提示
+    if (type === this._lastRealtimeType) return;
+
+    const tVideo = document.body.classList.contains('mode-single')
+        ? document.getElementById('singleVideo')
+        : document.getElementById('userVideo');
+
+    const t = tVideo && Number.isFinite(tVideo.currentTime) ? tVideo.currentTime : 0;
+
+    window.DanmakuManager.suggestions.push({
+        time: t + 0.2,
+        text,
+        type: (type === 'good' ? 'good' : 'warn'),
+        isSent: false
+    });
+
+    this._lastRealtimeTs = now;
+    this._lastRealtimeType = type;
+},
+
         stop() {
             this.isEnabled = false;
             this.lastPoses = { teach: null, user: null };
@@ -136,6 +196,7 @@
                 else if (score > 50) commentEl.textContent = "继续加油 💪";
                 else commentEl.textContent = "跟上节奏 🎵";
             }
+            this.pushRealtimeSuggestion(score, this.lastPoses.user);
         },
 
         calculateScore(kp1, kp2) {

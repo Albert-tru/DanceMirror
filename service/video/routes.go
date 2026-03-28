@@ -558,12 +558,39 @@ func (h *Handler) handleDispatchAnalyze(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// 2. 验证权限
-	video, err := h.checkVideoOwnership(w, r, videoID)
-	if err != nil {
-		utils.WriteError(w, http.StatusForbidden, err)
-		return
+	// 2. 验证权限（admin 可分析任意视频）
+	var video *types.Video
+	isAdmin := false
+	if h.userStore != nil {
+		u, userErr := h.userStore.GetUserByID(userID)
+		if userErr == nil && u.Role == "admin" {
+			isAdmin = true
+		}
 	}
 
+	if isAdmin {
+		video, err = h.store.GetVideoByID(r.Context(), videoID)
+		if err != nil {
+			utils.WriteError(w, http.StatusNotFound, fmt.Errorf("video not found"))
+			return
+		}
+	} else {
+		video, err = h.checkVideoOwnership(w, r, videoID)
+		if err != nil {
+			utils.WriteError(w, http.StatusForbidden, err)
+			return
+		}
+	}
+	// 3.5 清理旧分析缓存，避免命中历史 finished 结果
+	if h.cache != nil {
+		analysisKey := fmt.Sprintf("analysis:video:%d", videoID)
+		if err := h.cache.Delete(r.Context(), analysisKey); err != nil {
+			// 删除失败不阻塞主流程，只打日志
+			fmt.Printf("⚠️ failed to clear old analysis cache key=%s err=%v\n", analysisKey, err)
+		} else {
+			fmt.Printf("🧹 cleared old analysis cache key=%s\n", analysisKey)
+		}
+	}
 	// 3. 构造 Python Worker 可访问的路径
 	var inputPath string
 	if config.Envs.StorageDriver == "minio" {

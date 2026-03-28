@@ -46,3 +46,8 @@ coverage.out
 # Go 相关
 go.work
 go.work.sum
+
+.env
+.env.local
+secrets/*
+*.key

@@ -3,6 +3,7 @@ package user
 import (
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/Albert-tru/DanceMirror/types"
 	"gorm.io/gorm"
@@ -56,7 +57,14 @@ func (s *Store) UpdateUser(user *types.User) error {
 }
 
 func (s *Store) DeleteUser(id uint) error {
-	return s.db.Delete(&types.User{}, id).Error // 软删除
+	return s.db.Delete(&types.User{}, id).Error
+}
+
+func (s *Store) UpdateLoginMeta(userID int64, loginAt time.Time) error {
+	return s.db.Model(&types.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
+		"lastLoginAt": loginAt,
+		"updatedAt":   loginAt,
+	}).Error
 }
 
 func scanRowIntoUser(rows *sql.Rows) (*types.User, error) {

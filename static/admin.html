@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>后台管理 - DanceMirror</title>
+  <link rel="stylesheet" href="/static/css/common.css" />
+  <style>
+    body { background: #f8fafc; color: #111827; margin: 0; font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial,sans-serif; }
+    .wrap { max-width: 1400px; margin: 0 auto; padding: 16px; }
+    .top { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+    .tabs { display:flex; gap:8px; margin-bottom:12px; }
+    .tab { border:1px solid #d1d5db; background:#fff; padding:8px 12px; border-radius:8px; cursor:pointer; }
+    .tab.active { background:#4f46e5; color:#fff; border-color:#4f46e5; }
+    .panel { background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:12px; }
+    .toolbar { display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
+    input, select, button { padding:8px 10px; border:1px solid #d1d5db; border-radius:8px; }
+    button.primary { background:#4f46e5; border-color:#4f46e5; color:#fff; }
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    th, td { border-bottom:1px solid #e5e7eb; text-align:left; padding:8px; }
+    th { background:#f9fafb; position: sticky; top: 0; }
+    .table-wrap { max-height: 65vh; overflow:auto; }
+    .muted { color:#6b7280; font-size:12px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <h2>DanceMirror 后台管理</h2>
+      <a href="/static/index.html">返回首页</a>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="users">用户总览</button>
+      <button class="tab" data-tab="video">视频统计</button>
+      <button class="tab" data-tab="ai">AI统计</button>
+      <button class="tab" data-tab="trouble">排障页</button>
+    </div>
+
+    <div id="panel-users" class="panel">
+      <div class="toolbar">
+        <button class="primary" id="refreshUsers">刷新</button>
+      </div>
+      <div class="table-wrap"><table id="usersTable"></table></div>
+    </div>
+
+    <div id="panel-video" class="panel" style="display:none;">
+      <div class="toolbar">
+        <button class="primary" id="refreshVideo">刷新</button>
+      </div>
+      <div class="table-wrap"><table id="videoTable"></table></div>
+    </div>
+
+    <div id="panel-ai" class="panel" style="display:none;">
+      <div class="toolbar">
+        <button class="primary" id="refreshAI">刷新</button>
+      </div>
+      <div class="table-wrap"><table id="aiTable"></table></div>
+    </div>
+
+    <div id="panel-trouble" class="panel" style="display:none;">
+      <div class="toolbar">
+        <input id="qRequestId" placeholder="Request ID" />
+        <input id="qUserId" placeholder="User ID" />
+        <input id="qVideoId" placeholder="Video ID" />
+        <select id="qHours"><option value="24">近24小时</option><option value="48">近48小时</option><option value="72">近72小时</option></select>
+        <button class="primary" id="searchErrors">检索错误</button>
+        <button id="refreshFailed">失败任务</button>
+      </div>
+      <p class="muted">上半部分：API错误日志；下半部分：最近失败AI任务</p>
+      <div class="table-wrap"><table id="errorTable"></table></div>
+      <hr/>
+      <div class="table-wrap"><table id="failedTable"></table></div>
+    </div>
+  </div>
+
+  <script src="/static/js/admin.js"></script>
+</body>
+</html>
