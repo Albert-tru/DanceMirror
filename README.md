@@ -179,10 +179,19 @@ make run
 ./bin/dancemirror
 ```
 
-### 7. 访问应用
+### 7. 访问应用/当前效果
 - **主页**: http://localhost:8080/static/index.html
 - **增强播放器**: http://localhost:8080/static/video-player.html
 
+1. 个人主页
+视频库显示（附搜索功能）、视频上传
+![alt text](a4276b774d7bd67da499644dde57cc2.png)
+![alt text](3c06d0ba9f8c72c178e082173a39391.png)
+2. 单视频练习模式
+![alt text](image-2.png)
+3. AI姿态分析功能
+![alt text](f7190eab0275cf566518713118aff20.png)
+![alt text](image-3.png)
 ## 📚 API 文档
 
 ### 用户认证
